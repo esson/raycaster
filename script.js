@@ -1,13 +1,3 @@
-
-const MAP = LEVEL_1.map;
-const MAP_LEGEND = LEVEL_1.legend;
-
-const sprite = new Image();
-sprite.src = LEVEL_1.spriteUrl;
-
-console.debug('MAP');
-console.debug(MAP.map(y => y.map(z => z === 0 ? ' ' : z).join('')).join('\n'));
-
 const SCREEN_SCALE = 2.25;
 
 const SCREEN = {
@@ -31,6 +21,25 @@ const MOVE_SPEEDS = {
 };
 const TURN_RADIUS = Math.PI / 180 * 1.5;
 
+let SHOW_FPS = JSON.parse(localStorage.getItem('SHOW_FPS')) ?? true;
+let RENDER_SPRITES = JSON.parse(localStorage.getItem('RENDER_SPRITES')) ?? true;
+let INTERLACED_RENDERING = JSON.parse(localStorage.getItem('INTERLACED_RENDERING')) ?? true;
+
+
+const MAP = LEVEL_1.map;
+const MAP_LEGEND = LEVEL_1.legend;
+
+const OBJECTS = MAP.flatMap((row, y) => row.map((item, x) => ({
+    x: (x + .5) * CELLSIZE,
+    y: (y + .5) * CELLSIZE,
+    ...MAP_LEGEND[item]
+}))).filter(x => x.object);
+
+const spritesImage = new Image();
+spritesImage.src = LEVEL_1.spriteUrl;
+
+
+
 const MINIMAP_ALPHA = .9;
 const MINIMAP_SCALE = SCREEN.height / MAP.length / CELLSIZE / 2;
 const MINIMAP_CELLRADIUS = 12;
@@ -38,10 +47,6 @@ const MINIMAP_RAYS = false;
 const MINIMAP_NONE = 0;
 const MINIMAP_SMALL = 1;
 const MINIMAP_LARGE = 2;
-
-let SHOW_FPS = JSON.parse(localStorage.getItem('SHOW_FPS')) ?? true;
-let RENDER_SPRITES = JSON.parse(localStorage.getItem('RENDER_SPRITES')) ?? true;
-let INTERLACED_RENDERING = JSON.parse(localStorage.getItem('INTERLACED_RENDERING')) ?? true;
 
 /**
  * @type HTMLCanvasElement
@@ -51,6 +56,7 @@ canvas.width = SCREEN.width;
 canvas.height = SCREEN.height;
 
 var ctx = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = false;
 
 let statusText = null;
 let statusTimeoutId;
@@ -78,27 +84,29 @@ const controls = {
     stealth: false,
     strafe: false,
     map: MINIMAP_SMALL,
-    action: false
+    action: false,
+    pause: false
 };
 
 const controlsKeyboardMap = {
-    'KeyW': 'up',
-    'KeyA': 'left',
-    'KeyS': 'down',
-    'KeyD': 'right',
-    'ArrowUp': 'up',
-    'ArrowLeft': 'left',
-    'ArrowDown': 'down',
-    'ArrowRight': 'right',
-    'ShiftLeft': 'turbo',
-    'Space': 'action'
+    KeyW: 'up',
+    KeyA: 'left',
+    KeyS: 'down',
+    KeyD: 'right',
+    ArrowUp: 'up',
+    ArrowLeft: 'left',
+    ArrowDown: 'down',
+    ArrowRight: 'right',
+    ShiftLeft: 'turbo',
+    Space: 'action'
 };
 
 const controlsKeyboardToggleMap = {
+    KeyP: 'pause'
 };
 
 const controlsKeyboardSpecialMap = {
-    'KeyM': () => {
+    KeyM: () => {
         switch (controls.map) {
             case MINIMAP_NONE:
                 controls.map = MINIMAP_SMALL;
@@ -111,17 +119,20 @@ const controlsKeyboardSpecialMap = {
                 break;
         }
     },
-    'KeyU': () => SHOW_FPS = !SHOW_FPS,
+    KeyU: () => SHOW_FPS = !SHOW_FPS,
     'KeyI': () => {
         INTERLACED_RENDERING = !INTERLACED_RENDERING
         setStatusText('INTERLACING ' + (INTERLACED_RENDERING ? 'ON' : 'OFF'));
     },
-    'KeyO': () => {
+    KeyO: () => {
         RENDER_SPRITES = !RENDER_SPRITES
         setStatusText('SPRITES ' + (RENDER_SPRITES ? 'ON' : 'OFF'));
     },
-    'KeyR': () => {
+    KeyR: () => {
         player = { ...playerDefaults };
+    },
+    KeyL: () => {
+        ctx.imageSmoothingEnabled = !ctx.imageSmoothingEnabled;
     }
 }
 
@@ -132,7 +143,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 document.addEventListener('keyup', (e) => {
-    console.log(e.code)
+
     if (e.code in controlsKeyboardMap) {
         controls[controlsKeyboardMap[e.code]] = false;
     }
@@ -173,7 +184,7 @@ let frameCounter = 0;
 let last = performance.now();
 
 function loop() {
-    
+
     const now = performance.now();
     const delta = now - last;
 
@@ -181,21 +192,24 @@ function loop() {
     frameCounter++;
 
     try {
-        movePlayer(delta);
+        if (!controls.pause) {
+            movePlayer(delta);
 
-        const rays = getRays(player);
-        drawScene(rays);
+            const rays = getRays(player);
+            drawScene(rays);
+            drawSprite(rays, OBJECTS);
 
-        if (controls.map > 0) {
-            drawMiniMap(MAP, rays, controls.map === MINIMAP_LARGE);
-        }
+            if (controls.map > 0) {
+                drawMiniMap(MAP, rays, controls.map === MINIMAP_LARGE);
+            }
 
-        if (SHOW_FPS) {
-            drawFps(fps.tick());
-        }
+            if (SHOW_FPS) {
+                drawFps(fps.tick());
+            }
 
-        if (statusText) {
-            drawStatusText(statusText);
+            if (statusText) {
+                drawStatusText(statusText);
+            }
         }
 
         requestAnimationFrame(loop);
@@ -238,7 +252,7 @@ function getHorizontalCollision(angle, player) {
 
         cell = MAP[cellY][cellX];
 
-        if (cell && MAP_LEGEND[cell].solid) {
+        if (cell && MAP_LEGEND[cell].wall) {
             break;
         } else {
             cell = undefined;
@@ -254,7 +268,6 @@ function getHorizontalCollision(angle, player) {
         color: MAP_LEGEND[cell]?.darkColor,
         sprite: MAP_LEGEND[cell]?.darkSprite,
         spriteX: nextX - Math.floor(nextX / CELLSIZE) * CELLSIZE,
-        solid: MAP_LEGEND[cell]?.solid,
         vertical: false
     };
 }
@@ -283,7 +296,7 @@ function getVerticalCollision(angle, player) {
 
         cell = MAP[cellY][cellX];
 
-        if (cell && MAP_LEGEND[cell].solid) {
+        if (cell && MAP_LEGEND[cell].wall) {
             break;
         } else {
             cell = undefined;
@@ -299,7 +312,6 @@ function getVerticalCollision(angle, player) {
         color: MAP_LEGEND[cell]?.color,
         sprite: MAP_LEGEND[cell]?.sprite,
         spriteX: nextY - Math.floor(nextY / CELLSIZE) * CELLSIZE,
-        solid: MAP_LEGEND[cell]?.solid,
         vertical: true
     };
 }
@@ -328,10 +340,10 @@ function movePlayer(delta) {
     const timeScale = 10 / delta;
 
     if (!controls.strafe && controls.left) {
-        player.angle -= TURN_RADIUS * timeScale;
+        player.angle = fixAngle(player.angle - TURN_RADIUS * timeScale);
     }
     if (!controls.strafe && controls.right) {
-        player.angle += TURN_RADIUS * timeScale;
+        player.angle = fixAngle(player.angle + TURN_RADIUS * timeScale);
     }
 
     const speed = controls.turbo ? MOVE_SPEEDS.fast : MOVE_SPEEDS.normal;
@@ -401,8 +413,8 @@ function isIntersectingWall(x, y) {
     const mapY = Math.floor(y / CELLSIZE);
 
     const cell = MAP[mapY][mapX];
-    
-    return MAP_LEGEND[cell]?.solid === true;
+
+    return MAP_LEGEND[cell]?.wall === true || MAP_LEGEND[cell]?.object === true;
 }
 
 function drawScene(rays) {
@@ -411,9 +423,6 @@ function drawScene(rays) {
     let increment = INTERLACED_RENDERING ? 2 : 1;
 
     const length = rays.length;
-
-    const gapCorrection = RENDER_SPRITES ? 10 : 0;
-    const spriteCorrection = 14;
 
     for (; i < length; i += increment) {
 
@@ -425,18 +434,18 @@ function drawScene(rays) {
 
         // Ceiling
         ctx.fillStyle = CEILING_COLOR;
-        ctx.fillRect(i, 0, 1, wallY + gapCorrection);
+        ctx.fillRect(i, 0, 1, wallY);
 
         // Floor
         ctx.fillStyle = FLOOR_COLOR;
-        ctx.fillRect(i, wallY + wallHeight - gapCorrection, 1, SCREEN.height / 2 + wallHeight / 2 + gapCorrection);
+        ctx.fillRect(i, wallY + wallHeight, 1, SCREEN.height / 2 + wallHeight / 2);
 
         // Wall
         if (!RENDER_SPRITES) {
             ctx.fillStyle = ray.color;
             ctx.fillRect(i, wallY, 1, wallHeight);
         } else {
-            ctx.drawImage(sprite, ray.sprite.x + ray.spriteX, ray.sprite.y, 1, 64, i, wallY - spriteCorrection, 1, wallHeight + spriteCorrection)
+            ctx.drawImage(spritesImage, ray.sprite.x + ray.spriteX, ray.sprite.y, 1, 64, i, wallY, 1, wallHeight)
         }
     }
 }
@@ -545,24 +554,61 @@ function drawStatusText(text) {
     ctx.fillText(text, 5, 5);
 }
 
-sprite.onload = () => {
+/**
+ * Keeps the angle between -Math.PI and Math.PI. Required to be able to compare angles.
+ * @param {number} angle 
+ */
+function fixAngle(angle) {
+    if (angle < -Math.PI) {
+        return angle + 2.0 * Math.PI;
+    }
+    if (angle > Math.PI) {
+        return angle - 2.0 * Math.PI;
+    }
+    return angle;
+}
+
+
+function drawSprite(rays, objects) {
+
+    objects.forEach(object => {
+
+        const distance = Vector.distance(player.x, player.y, object.x, object.y);
+
+        if (distance < CELLSIZE * .5) {
+            return;
+        }
+
+        const angle = fixAngle(Math.atan2(object.y - player.y, object.x - player.x));
+        const size = ((CELLSIZE * WALL_HEIGHT) / distance) * 277;
+        const x = Math.floor(SCREEN.width / 2 - (player.angle - angle) * SCREEN.width / FOV - size / 2);
+
+        for (let i = 0; i < size; i++) {
+            if (x + i >= 0 && x + i < rays.length && rays[x + i].distance > distance) {
+                ctx.drawImage(spritesImage, MAP_LEGEND[8].sprite.x + Math.floor(64 / size * i), MAP_LEGEND[8].sprite.y, 1, 64, x + i, SCREEN.height / 2 - size / 2, 1, size);
+            }
+        }
+    });
+}
+
+spritesImage.onload = () => {
     // Remove the loader to prevent looping behaviour.
-    sprite.onload = null;
+    spritesImage.onload = null;
 
     // The sprite image doesn't contain opacity data, 
     // so we need to turn all pink colors to 0 alpha.
 
     // Create a temporary canvas.
     const canvas = document.createElement('canvas');
-    canvas.width = sprite.width;
-    canvas.height = sprite.height;
+    canvas.width = spritesImage.width;
+    canvas.height = spritesImage.height;
 
     // Get the context and draw the sprite onto it.
     const ctx = canvas.getContext('2d');
-    ctx.drawImage(sprite, 0, 0);
+    ctx.drawImage(spritesImage, 0, 0);
 
     // Get the image data.
-    const imageData = ctx.getImageData(0, 0, sprite.width, sprite.height);
+    const imageData = ctx.getImageData(0, 0, spritesImage.width, spritesImage.height);
     const data = imageData.data;
 
     // Convert rgba(152, 0, 136, 255) to transparent.
@@ -575,10 +621,10 @@ sprite.onload = () => {
 
     // Place the modifed image data onto the canvas.
     ctx.putImageData(imageData, 0, 0);
-    sprite.src = canvas.toDataURL();
-    
+    spritesImage.src = canvas.toDataURL();
+
     // Remove the temporary canvas
     canvas.remove();
-    
+
     startGame();
 };
