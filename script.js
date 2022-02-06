@@ -185,6 +185,45 @@ function iterateMap(map, fn) {
 let frameCounter = 0;
 let last = performance.now();
 
+class PerformanceCounter {
+    constructor(samples = 1000) {
+        this.samples = samples;
+        this.history = [];
+    }
+
+    start() {
+        this.lastP = performance.now();
+    }
+
+    stop() {
+        const delta = performance.now() - this.lastP;
+        if (this.history.length > this.samples) {
+            this.history.pop();
+        }
+        this.history.unshift(delta);
+    }
+
+    getLast() {
+        return this.history[0] ?? 0;
+    }
+
+    getAverage() {
+        return this.history.reduce((acc, x) => acc + x, 0) / this.history.length;
+    }
+
+    getMin() {
+        if (!this.history.length) return 0;
+        return this.history.reduce((acc, x) => Math.min(x, acc), this.history[0]);
+    }
+
+    getMax() {
+        return this.history.reduce((acc, x) => Math.max(x, acc), 0);
+    }
+}
+
+const calcPerf = new PerformanceCounter();
+const drawPerf = new PerformanceCounter();
+
 function loop() {
 
     const now = performance.now();
@@ -195,9 +234,16 @@ function loop() {
 
     try {
         if (!controls.pause) {
-            movePlayer(delta);
 
+            calcPerf.start();
+
+            movePlayer(delta);
             const rays = getRays(player);
+
+            calcPerf.stop();
+
+            drawPerf.start();
+
             drawScene(rays);
             drawSprite(rays, OBJECTS);
 
@@ -207,11 +253,14 @@ function loop() {
 
             if (SHOW_FPS) {
                 drawFps(fps.tick());
+                drawPerformance();
             }
 
             if (statusText) {
                 drawStatusText(statusText);
             }
+
+            drawPerf.stop();
         }
 
         requestAnimationFrame(loop);
@@ -602,7 +651,7 @@ function drawMiniMap(map, rays, largeMap) {
         if (DOOR_MAP_LEGEND[colorIndex].inset) {
             if (map[y - 1][x]) {
                 // Vertical door
-                ctx.fillRect(left + x * size + size/3, top + y * size, size / 3, size);
+                ctx.fillRect(left + x * size + size / 3, top + y * size, size / 3, size);
             } else {
                 ctx.fillRect(left + x * size, top + y * size + size / 3, size, size / 3);
             }
@@ -662,6 +711,40 @@ function drawFps(fps) {
     const display = `${fps} FPS`;
     const size = ctx.measureText(display);
     ctx.fillText(display, SCREEN.width - (size.width + 5), 5);
+}
+
+function drawPerformance() {
+    ctx.font = OSD_FONT;
+    ctx.fillStyle = OSD_COLOR;
+    ctx.textBaseline = 'top'
+
+    let display = `Calculations: ${calcPerf.getLast().toFixed(2)}, ${calcPerf.getAverage().toFixed(2)} MS`;
+    let size = ctx.measureText(display);
+    ctx.fillText(display, SCREEN.width - (size.width + 5), 30);
+
+    display = `Drawing: ${drawPerf.getLast().toFixed(2)}, ${drawPerf.getAverage().toFixed(2)} MS`;
+    size = ctx.measureText(display);
+    ctx.fillText(display, SCREEN.width - (size.width + 5), 60);
+
+
+
+    ctx.strokeStyle = OSD_COLOR;
+    function drawPerformaceChart(drawPerf, top) {
+        ctx.strokeRect(0, top, 1000, 50);
+
+        ctx.beginPath()
+        ctx.moveTo(0, top + 50);
+
+        for (let index = 0; index < drawPerf.history.length; index++) {
+            const y = drawPerf.history[index];
+            ctx.lineTo(index, top + 50 - y);
+        }
+
+        ctx.stroke();
+    }
+
+    drawPerformaceChart(calcPerf, 0);
+    drawPerformaceChart(drawPerf, 50);
 }
 
 function drawStatusText(text) {
