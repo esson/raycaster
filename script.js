@@ -6,18 +6,19 @@ const SCREEN = {
 };
 
 const FOV = 70 * Math.PI / 180;
-const CELLSIZE = 64;
 const WALL_HEIGHT = SCREEN.height / 240;
+const SPRITE_SIZE = 64;
 
 const CEILING_COLOR = '#333';
 const FLOOR_COLOR = '#777';
 const OSD_COLOR = '#0f0';
 const OSD_FONT = '20px sans-serif';
 
+
 const MOVE_SPEEDS = {
-    slow: CELLSIZE / 100 * 2,
-    normal: CELLSIZE / 100 * 4,
-    fast: CELLSIZE / 100 * 6
+    slow: 1 / 100 * 2,
+    normal: 1 / 100 * 4,
+    fast: 1 / 100 * 6
 };
 const TURN_RADIUS = Math.PI / 180 * 1.5;
 
@@ -25,7 +26,6 @@ let SHOW_FPS = JSON.parse(localStorage.getItem('SHOW_FPS')) ?? true;
 let SHOW_PERF = JSON.parse(localStorage.getItem('SHOW_PERF')) ?? true;
 let RENDER_SPRITES = JSON.parse(localStorage.getItem('RENDER_SPRITES')) ?? true;
 let INTERLACED_RENDERING = JSON.parse(localStorage.getItem('INTERLACED_RENDERING')) ?? true;
-
 
 const MAP = LEVEL_1.map;
 const MAP_LEGEND = LEVEL_1.legend;
@@ -36,8 +36,8 @@ const OBJECTS_MAP_LEGEND = LEVEL_1.objectsLegend;
 
 const OBJECTS = OBJECTS_MAP.flatMap((row, y) => row.map((item, x) => ({
     id: item,
-    x: (x + .5) * CELLSIZE,
-    y: (y + .5) * CELLSIZE,
+    x: x + .5,
+    y: y + .5,
     ...OBJECTS_MAP_LEGEND[item]
 }))).filter(x => x.id);
 
@@ -45,7 +45,7 @@ const spritesImage = new Image();
 spritesImage.src = LEVEL_1.spriteUrl;
 
 const MINIMAP_ALPHA = .9;
-const MINIMAP_SCALE = SCREEN.height / MAP.length / CELLSIZE / 2;
+const MINIMAP_SCALE = SCREEN.height / MAP.length / 2;
 const MINIMAP_CELLRADIUS = 12;
 const MINIMAP_RAYS = false;
 const MINIMAP_NONE = 0;
@@ -147,7 +147,7 @@ document.addEventListener('keydown', (e) => {
     if (e.code in controlsKeyboardMap) {
         if (Array.isArray(controlsKeyboardMap[e.code])) {
             controlsKeyboardMap[e.code].forEach(key => {
-                controls[key] = true;    
+                controls[key] = true;
             });
         } else {
             controls[controlsKeyboardMap[e.code]] = true;
@@ -182,8 +182,8 @@ window.addEventListener('unload', (e) => {
 });
 
 const playerDefaults = {
-    x: 30 * CELLSIZE + CELLSIZE / 2,
-    y: 50 * CELLSIZE + CELLSIZE / 2,
+    x: 30.5,
+    y: 50.5,
     angle: 0,
     speed: 0,
     side: 0
@@ -331,6 +331,8 @@ function loop() {
 
             drawPerf.start();
 
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
             drawScene(rays);
             drawObjects(rays, OBJECTS);
 
@@ -393,10 +395,10 @@ function getHorizontalCollision(angle, player) {
 
     const up = Math.abs(Math.floor(angle / Math.PI) % 2) > 0;
 
-    const mapY = up ? Math.floor(player.y / CELLSIZE) * CELLSIZE : Math.floor(player.y / CELLSIZE) * CELLSIZE + CELLSIZE;
+    const mapY = up ? Math.floor(player.y) : Math.floor(player.y) + 1;
     const mapX = player.x + (mapY - player.y) / Math.tan(angle);
 
-    const stepY = up ? -CELLSIZE : CELLSIZE;
+    const stepY = up ? -1 : 1;
     const stepX = stepY / Math.tan(angle);
 
     const halfStepX = stepX / 2;
@@ -411,8 +413,8 @@ function getHorizontalCollision(angle, player) {
     let sprite;
 
     while (!wall && !door) {
-        const cellX = Math.floor(nextX / CELLSIZE);
-        const cellY = up ? Math.floor(nextY / CELLSIZE) - 1 : Math.floor(nextY / CELLSIZE);
+        const cellX = Math.floor(nextX);
+        const cellY = up ? Math.floor(nextY) - 1 : Math.floor(nextY);
 
         if (isOutOfBounds(cellX, cellY, MAP[0].length, MAP.length)) {
             color = MAP_LEGEND[0]?.darkColor;
@@ -463,7 +465,7 @@ function getHorizontalCollision(angle, player) {
         distance: Vector.distance(player.x, player.y, nextX, nextY),
         color: color,
         sprite: sprite,
-        spriteX: nextX - Math.floor(nextX / CELLSIZE) * CELLSIZE,
+        spriteX: (nextX - Math.floor(nextX)) * SPRITE_SIZE,
         vertical: false
     };
 }
@@ -472,10 +474,10 @@ function getVerticalCollision(angle, player) {
 
     const right = Math.abs(Math.floor((angle - Math.PI / 2) / Math.PI) % 2) > 0;
 
-    const mapX = right ? Math.floor(player.x / CELLSIZE) * CELLSIZE + CELLSIZE : Math.floor(player.x / CELLSIZE) * CELLSIZE;
+    const mapX = right ? Math.floor(player.x) + 1 : Math.floor(player.x);
     const mapY = player.y + (mapX - player.x) * Math.tan(angle);
 
-    const stepX = right ? CELLSIZE : -CELLSIZE;
+    const stepX = right ? 1 : -1;
     const stepY = stepX * Math.tan(angle);
 
     const halfStepX = stepX / 2;
@@ -490,8 +492,8 @@ function getVerticalCollision(angle, player) {
     let sprite;
 
     while (!wall && !door) {
-        const cellX = right ? Math.floor(nextX / CELLSIZE) : Math.floor(nextX / CELLSIZE) - 1;;
-        const cellY = Math.floor(nextY / CELLSIZE);
+        const cellX = right ? Math.floor(nextX) : Math.floor(nextX) - 1;;
+        const cellY = Math.floor(nextY);
 
         if (isOutOfBounds(cellX, cellY, MAP[0].length, MAP.length)) {
             color = MAP_LEGEND[0]?.color;
@@ -542,7 +544,7 @@ function getVerticalCollision(angle, player) {
         distance: Vector.distance(player.x, player.y, nextX, nextY),
         color: color,
         sprite: sprite,
-        spriteX: nextY - Math.floor(nextY / CELLSIZE) * CELLSIZE,
+        spriteX: (nextY - Math.floor(nextY)) * SPRITE_SIZE,
         vertical: true
     };
 }
@@ -600,8 +602,8 @@ function movePlayer(delta) {
     }
 
     if (controls.action) {
-        let doorX = Math.floor((player.x + Math.cos(player.angle) * CELLSIZE) / CELLSIZE);
-        let doorY = Math.floor((player.y + Math.sin(player.angle) * CELLSIZE) / CELLSIZE);
+        let doorX = Math.floor(player.x + Math.cos(player.angle));
+        let doorY = Math.floor(player.y + Math.sin(player.angle));
 
         if (DOOR_MAP[doorY][doorX] === 1) {
             DOOR_MAP[doorY][doorX] = 2;
@@ -609,8 +611,8 @@ function movePlayer(delta) {
             const autoClose = () => {
                 setTimeout(() => {
                     // Make sure player isn't standing in door way.
-                    const x = Math.floor(player.x / CELLSIZE),
-                        y = Math.floor(player.y / CELLSIZE);
+                    const x = Math.floor(player.x);
+                    const y = Math.floor(player.y);
 
                     if (y === doorY && x === doorX) {
                         autoClose();
@@ -655,8 +657,8 @@ function movePlayer(delta) {
 }
 
 function isIntersectingWall(x, y) {
-    const mapX = Math.floor(x / CELLSIZE);
-    const mapY = Math.floor(y / CELLSIZE);
+    const mapX = Math.floor(x);
+    const mapY = Math.floor(y);
 
     const wall = MAP[mapY][mapX];
 
@@ -685,7 +687,7 @@ function drawScene(rays) {
         const ray = rays[i];
 
         const distance = viewCorrection(ray.distance, ray.angle, player.angle);
-        const wallHeight = ((CELLSIZE * WALL_HEIGHT) / distance) * 277;
+        const wallHeight = WALL_HEIGHT / distance * 277;
         const wallY = SCREEN.height / 2 - wallHeight / 2;
 
         // Ceiling
@@ -701,7 +703,7 @@ function drawScene(rays) {
             ctx.fillStyle = ray.color;
             ctx.fillRect(i, wallY, 1, wallHeight);
         } else {
-            ctx.drawImage(spritesImage, ray.sprite.x + ray.spriteX, ray.sprite.y, 1, 64, i, wallY, 1, wallHeight)
+            ctx.drawImage(spritesImage, ray.sprite.x + ray.spriteX, ray.sprite.y, 1, SPRITE_SIZE, i, wallY, 1, wallHeight);
         }
     }
 }
@@ -712,17 +714,17 @@ function drawObjects(rays, objects) {
 
         const distance = Vector.distance(player.x, player.y, object.x, object.y);
 
-        if (distance < CELLSIZE / 2) {
+        if (distance < .5) {
             return;
         }
 
         const angle = fixAngle(Math.atan2(object.y - player.y, object.x - player.x));
-        const size = ((CELLSIZE * WALL_HEIGHT) / distance) * 277;
+        const size = WALL_HEIGHT / distance * 277;
         const x = Math.floor(SCREEN.width / 2 - (player.angle - angle) * SCREEN.width / FOV - size / 2);
 
         for (let i = 0; i < size; i++) {
             if (x + i >= 0 && x + i < rays.length && rays[x + i].distance > distance) {
-                ctx.drawImage(spritesImage, object.sprite.x + Math.floor(64 / size * i), object.sprite.y, 1, 64, x + i, SCREEN.height / 2 - size / 2, 1, size);
+                ctx.drawImage(spritesImage, object.sprite.x + Math.floor(SPRITE_SIZE / size * i), object.sprite.y, 1, SPRITE_SIZE, x + i, SCREEN.height / 2 - size / 2, 1, size);
             }
         }
     });
@@ -730,17 +732,14 @@ function drawObjects(rays, objects) {
 
 function drawMiniMap(map, rays, largeMap) {
 
-    // Use .floor to work with even numbers.
-    const size = Math.floor(CELLSIZE * MINIMAP_SCALE);
-    // Get the corrected scale after .floor
-    const scale = size / CELLSIZE;
-    const width = map[0].length * size;
-    const height = map.length * size;
-    const left = SCREEN.width / 2 - width / 2;
-    const top = SCREEN.height / 2 - height / 2;
+    const scale = Math.floor(MINIMAP_SCALE);
+    const width = map[0].length * scale;
+    const height = map.length * scale;
+    const left = Math.floor(SCREEN.width / 2 - width / 2);
+    const top = Math.floor(SCREEN.height / 2 - height / 2);
     const position = new Vector(player.x, player.y).multiply(scale).add(left, top);
-    const radius = size * MINIMAP_CELLRADIUS;
-    const translate = new Vector(0, 0).subtract(position).add(radius).add(size, SCREEN.height - radius * 2 - size);
+    const radius = scale * MINIMAP_CELLRADIUS;
+    const translate = new Vector(0, 0).subtract(position).add(radius).add(scale, SCREEN.height - radius * 2 - scale);
 
 
     if (!largeMap) {
@@ -768,7 +767,7 @@ function drawMiniMap(map, rays, largeMap) {
             return;
         }
         ctx.fillStyle = MAP_LEGEND[colorIndex].color;
-        ctx.fillRect(left + x * size, top + y * size, size, size);
+        ctx.fillRect(left + x * scale, top + y * scale, scale, scale);
     });
 
     // Doors
@@ -780,12 +779,12 @@ function drawMiniMap(map, rays, largeMap) {
         if (DOOR_MAP_LEGEND[colorIndex].inset) {
             if (map[y - 1][x]) {
                 // Vertical door
-                ctx.fillRect(left + x * size + size / 3, top + y * size, size / 3, size);
+                ctx.fillRect(left + x * scale + scale / 3, top + y * scale, scale / 3, scale);
             } else {
-                ctx.fillRect(left + x * size, top + y * size + size / 3, size, size / 3);
+                ctx.fillRect(left + x * scale, top + y * scale + scale / 3, scale, scale / 3);
             }
         } else {
-            ctx.fillRect(left + x * size, top + y * size, size, size);
+            ctx.fillRect(left + x * scale, top + y * scale, scale, scale);
         }
     });
 
@@ -807,11 +806,11 @@ function drawMiniMap(map, rays, largeMap) {
     // Torso
     ctx.fillStyle = 'black';
     ctx.beginPath();
-    ctx.ellipse(position.x, position.y, CELLSIZE / 2 * scale, CELLSIZE / 3 * scale, player.angle + Math.PI / 2, 0, Math.PI * 2)
+    ctx.ellipse(position.x, position.y, scale / 2, scale / 3, player.angle + Math.PI / 2, 0, Math.PI * 2)
     ctx.fill();
 
     // Direction
-    const destination = new Vector(Math.cos(player.angle), Math.sin(player.angle)).multiply(size).add(position);
+    const destination = new Vector(Math.cos(player.angle), Math.sin(player.angle)).multiply(scale).add(position);
     ctx.strokeStyle = 'black';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -822,7 +821,7 @@ function drawMiniMap(map, rays, largeMap) {
     // Head
     ctx.fillStyle = 'orange';
     ctx.beginPath();
-    ctx.arc(position.x, position.y, CELLSIZE / 4 * scale, 0, Math.PI * 2);
+    ctx.arc(position.x, position.y, scale / 4, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.globalAlpha = 1;
