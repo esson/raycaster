@@ -1,6 +1,6 @@
 import './styles.css';
 import Vector from './vector';
-import LEVEL_1 from './level-1'
+import level_1_1 from './level-1-1'
 import fps from './fps'
 import PerformanceCounter from './performance-counter';
 
@@ -50,8 +50,6 @@ const PERFORMANCE_X = SCREEN_WIDTH - PERFORMANCE_WIDTH - 10;
 const PERFORMANCE_Y = SCREEN_HEIGHT - (PERFORMANCE_HEIGHT + 5) * 2 - 10;
 
 const PLAYER_DEFAULT = {
-    x: 30.5,
-    y: 50.5,
     angle: 0,
     speed: 0,
     side: 0
@@ -69,23 +67,14 @@ let RENDER_INTERLACED = JSON.parse(localStorage.getItem('RENDER_INTERLACED')) ??
 // Level / Map / Doors / Objects
 //
 
-const currentLevel = {
-    wallMap: null,
-    walls: null,
-    doorMap: null,
-    doors: null,
-    objectMap: null,
-    objects: null,
-    spriteUrl: '',
-    spawn: new Vector(30.5, 50.5)
-};
+const LEVEL = level_1_1;
 
-const WALLS = LEVEL_1.walls;
-const WALLS_LEGEND = LEVEL_1.wallsLegend;
-const DOOR_MAP = LEVEL_1.doors;
-const DOOR_MAP_LEGEND = LEVEL_1.doorsLegend;
-const OBJECTS_MAP = LEVEL_1.objects;
-const OBJECTS_MAP_LEGEND = LEVEL_1.objectsLegend;
+const WALLS = LEVEL.walls;
+const WALLS_LEGEND = LEVEL.wallsLegend;
+const DOOR_MAP = LEVEL.doors;
+const DOOR_MAP_LEGEND = LEVEL.doorsLegend;
+const OBJECTS_MAP = LEVEL.objects;
+const OBJECTS_MAP_LEGEND = LEVEL.objectsLegend;
 
 const OBJECTS = OBJECTS_MAP.flatMap((row, y) => row.map((item, x) => ({
     id: item,
@@ -98,7 +87,7 @@ const OBJECTS = OBJECTS_MAP.flatMap((row, y) => row.map((item, x) => ({
 //
 
 const spritesheet = new Image();
-spritesheet.src = LEVEL_1.spriteUrl;
+spritesheet.src = LEVEL.spriteUrl;
 spritesheet.onload = () => {
 
     // Remove the loader to prevent looping behaviour.
@@ -231,7 +220,7 @@ const keyboardToFunctionMap = {
     // Toggle Sprites
     KeyO: () => setMessageText('SPRITES', RENDER_SPRITES = !RENDER_SPRITES),
     // Reset
-    KeyR: () => (setMessageText('PLAYER RESET'), player = { ...PLAYER_DEFAULT }),
+    KeyR: () => (setMessageText('PLAYER RESET'), player = { ...PLAYER_DEFAULT, x: LEVEL.spawn.x, y: LEVEL.spawn.y }),
     // Toggle Smoothing
     KeyL: () => setMessageText('SMOOTHING', ctx.imageSmoothingEnabled = !ctx.imageSmoothingEnabled)
 }
@@ -279,7 +268,7 @@ window.addEventListener('unload', (e) => {
 
 // Player
 //
-let player = JSON.parse(localStorage.getItem('player')) ?? { ...PLAYER_DEFAULT };
+let player = JSON.parse(localStorage.getItem('player')) ?? { ...PLAYER_DEFAULT, x: LEVEL.spawn.x, y: LEVEL.spawn.y };
 
 // Game Loop
 //

@@ -1,6 +1,6 @@
 import Vector from './vector';
 
-function buildLevel1() {
+function createLevel() {
 
     const walls = [
         '                            3333333333333                      ',
@@ -213,6 +213,8 @@ function buildLevel1() {
     objectSprites.unshift(undefined);
 
     return {
+        spawn: new Vector(29, 50).add(.5),
+
         walls: walls.map(mapLiteralToMapIndex),
         wallsLegend: wallSprites,
         
@@ -234,6 +236,6 @@ function getSpriteVector(index, w = 16) {
     return new Vector(index % w, Math.floor(index / w)).multiply(65);
 }
 
-const LEVEL_1 = buildLevel1();
+const level_1_1 = createLevel();
 
-export default LEVEL_1;
+export default level_1_1;
