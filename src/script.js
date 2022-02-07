@@ -1,31 +1,68 @@
-const SCREEN_SCALE = 2.25;
+import './styles.css';
+import Vector from './vector';
+import LEVEL_1 from './level-1'
+import fps from './fps'
+import PerformanceCounter from './performance-counter';
 
-const SCREEN = {
-    width: 640 * SCREEN_SCALE,
-    height: 480 * SCREEN_SCALE
-};
+// Constants
+//
+
+const SCREEN_SCALE = 2.25;
+const SCREEN_WIDTH = 640 * SCREEN_SCALE;
+const SCREEN_HEIGHT = 480 * SCREEN_SCALE;
 
 const FOV = 70 * Math.PI / 180;
-const WALL_HEIGHT = SCREEN.height / 240;
+const WALL_HEIGHT = SCREEN_HEIGHT / 240;
 const SPRITE_SIZE = 64;
 
 const CEILING_COLOR = '#333';
 const FLOOR_COLOR = '#777';
+
 const OSD_COLOR = '#0f0';
 const OSD_FONT = '20px sans-serif';
 
+const MOVE_SLOW = .02;
+const MOVE_NORMAL = .04;
+const MOVE_FAST = .06;
 
-const MOVE_SPEEDS = {
-    slow: 1 / 100 * 2,
-    normal: 1 / 100 * 4,
-    fast: 1 / 100 * 6
-};
 const TURN_RADIUS = Math.PI / 180 * 1.5;
+
+const MINIMAP_ALPHA = .9;
+const MINIMAP_CELLRADIUS = 12;
+const MINIMAP_RAYS = false;
+const MINIMAP_NONE = 0;
+const MINIMAP_SMALL = 1;
+const MINIMAP_LARGE = 2;
+
+const PLAYER_DEFAULT = {
+    x: 30.5,
+    y: 50.5,
+    angle: 0,
+    speed: 0,
+    side: 0
+};
+
+// Settings
+//
 
 let SHOW_FPS = JSON.parse(localStorage.getItem('SHOW_FPS')) ?? true;
 let SHOW_PERF = JSON.parse(localStorage.getItem('SHOW_PERF')) ?? true;
 let RENDER_SPRITES = JSON.parse(localStorage.getItem('RENDER_SPRITES')) ?? true;
 let INTERLACED_RENDERING = JSON.parse(localStorage.getItem('INTERLACED_RENDERING')) ?? true;
+
+// Level
+//
+
+const currentLevel = {
+    wallMap: null,
+    walls: null,
+    doorMap: null,
+    doors: null,
+    objectMap: null,
+    objects: null,
+    spriteUrl: '',
+    spawn: new Vector(30.5, 50.5)
+};
 
 const MAP = LEVEL_1.map;
 const MAP_LEGEND = LEVEL_1.legend;
@@ -44,20 +81,12 @@ const OBJECTS = OBJECTS_MAP.flatMap((row, y) => row.map((item, x) => ({
 const spritesImage = new Image();
 spritesImage.src = LEVEL_1.spriteUrl;
 
-const MINIMAP_ALPHA = .9;
-const MINIMAP_SCALE = SCREEN.height / MAP.length / 2;
-const MINIMAP_CELLRADIUS = 12;
-const MINIMAP_RAYS = false;
-const MINIMAP_NONE = 0;
-const MINIMAP_SMALL = 1;
-const MINIMAP_LARGE = 2;
-
 /**
  * @type HTMLCanvasElement
  */
 var canvas = document.getElementById('canvas');
-canvas.width = SCREEN.width;
-canvas.height = SCREEN.height;
+canvas.width = SCREEN_WIDTH;
+canvas.height = SCREEN_HEIGHT;
 
 var ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false;
@@ -97,8 +126,6 @@ const controlsKeyboardMap = {
     KeyA: 'left',
     KeyS: 'down',
     KeyD: 'right',
-    KeyQ: ['strafe', 'left'],
-    KeyE: ['strafe', 'right'],
     ArrowUp: 'up',
     ArrowLeft: 'left',
     ArrowDown: 'down',
@@ -112,6 +139,7 @@ const controlsKeyboardToggleMap = {
 };
 
 const controlsKeyboardSpecialMap = {
+    // Toggle Mini-Map
     KeyM: () => {
         switch (controls.map) {
             case MINIMAP_NONE:
@@ -125,50 +153,43 @@ const controlsKeyboardSpecialMap = {
                 break;
         }
     },
+    // Toggle FPS
     KeyU: () => SHOW_FPS = !SHOW_FPS,
+    // Toggle Performance
     KeyC: () => SHOW_PERF = !SHOW_PERF,
+    // Toggle Interlacing
     KeyI: () => {
         INTERLACED_RENDERING = !INTERLACED_RENDERING
         setStatusText('INTERLACING ' + (INTERLACED_RENDERING ? 'ON' : 'OFF'));
     },
+    // Toggle Sprites
     KeyO: () => {
         RENDER_SPRITES = !RENDER_SPRITES
         setStatusText('SPRITES ' + (RENDER_SPRITES ? 'ON' : 'OFF'));
     },
-    KeyR: () => {
-        player = { ...playerDefaults };
-    },
-    KeyL: () => {
-        ctx.imageSmoothingEnabled = !ctx.imageSmoothingEnabled;
-    }
+    // Reset
+    KeyR: () => player = { ...PLAYER_DEFAULT },
+    // Toggle Smoothing
+    KeyL: () => ctx.imageSmoothingEnabled = !ctx.imageSmoothingEnabled
 }
 
 document.addEventListener('keydown', (e) => {
+    // Set true by keyboard map
     if (e.code in controlsKeyboardMap) {
-        if (Array.isArray(controlsKeyboardMap[e.code])) {
-            controlsKeyboardMap[e.code].forEach(key => {
-                controls[key] = true;
-            });
-        } else {
-            controls[controlsKeyboardMap[e.code]] = true;
-        }
+        controls[controlsKeyboardMap[e.code]] = true;
     }
 });
 
 document.addEventListener('keyup', (e) => {
-
+    // Set false by keyboard map
     if (e.code in controlsKeyboardMap) {
-        if (Array.isArray(controlsKeyboardMap[e.code])) {
-            controlsKeyboardMap[e.code].forEach(key => {
-                controls[key] = false;
-            });
-        } else {
-            controls[controlsKeyboardMap[e.code]] = false;
-        }
+        controls[controlsKeyboardMap[e.code]] = false;
     }
+    // Toggle true/false by keyboard map
     if (e.code in controlsKeyboardToggleMap) {
         controls[controlsKeyboardToggleMap[e.code]] = !controls[controlsKeyboardToggleMap[e.code]];
     }
+    // Map to special logic
     if (e.code in controlsKeyboardSpecialMap) {
         controlsKeyboardSpecialMap[e.code]();
     }
@@ -181,132 +202,13 @@ window.addEventListener('unload', (e) => {
     localStorage.setItem('RENDER_SPRITES', JSON.stringify(RENDER_SPRITES));
 });
 
-const playerDefaults = {
-    x: 30.5,
-    y: 50.5,
-    angle: 0,
-    speed: 0,
-    side: 0
-};
+let player = JSON.parse(localStorage.getItem('player')) ?? { ...PLAYER_DEFAULT };
 
-let player = JSON.parse(localStorage.getItem('player')) ?? { ...playerDefaults };
-
-function iterateMap(map, fn) {
-    for (let y = 0; y < map.length; y++) {
-        for (let x = 0; x < map[y].length; x++) {
-            fn(x, y, map[y][x]);
-        }
-    }
-}
-
+/**
+ * Increases on each frame, used to render with interlaced vertical lines.
+ */
 let frameCounter = 0;
 let last = performance.now();
-
-class PerformanceCounter {
-
-    constructor(name, samples = 1000) {
-        this.name = name;
-        this.samples = samples;
-        this.min = 0;
-        this.max = 0;
-        this.history = [];
-    }
-
-    /**
-     * 
-     * @param {CanvasRenderingContext2D} ctx 
-     * @param {*} color 
-     * @param {*} x 
-     * @param {*} y 
-     * @param {*} w 
-     * @param {*} h 
-     */
-    draw(ctx, color, x, y, w, h) {
-
-        const max = this.getMax();
-        const min = this.getMin();
-        const mid = min + (max - min) / 2;
-        const avg = this.getAverage();
-
-        // Draw the Line Chart
-        const wScale = (w - 2) / this.samples;
-        const hScale = (h - 2) / max - min;
-
-        ctx.strokeStyle = color;
-        ctx.beginPath();
-        for (let index = 0; index < this.history.length; index++) {
-            const ly = this.history[index];
-            ctx.lineTo((x + 1) + wScale * index, y + 1 + h - 2 - ly * hScale);
-        }
-
-        ctx.stroke();
-
-        // Draw the texts
-        const fontSize = h / 6;
-        const tickW = 3;
-
-        ctx.strokeStyle = 'white';
-        ctx.fillStyle = 'white';
-        ctx.font = `${fontSize}px sans-serif`;
-        ctx.textBaseline = 'middle';
-        ctx.lineWidth = 1;
-
-        ctx.strokeRect(x, y, w, h);
-
-        ctx.fillText(this.name, x + fontSize / 2, y + fontSize);
-
-        const avgTxt = `Value: ${this.history[0]?.toFixed(2)} ms | Avg: ${avg.toFixed(2)} ms`;
-        const avgW = ctx.measureText(avgTxt).width;
-        ctx.fillText(avgTxt, x + w - 2 - avgW - fontSize / 4, y + fontSize);
-
-        const yStep = h / 2;
-
-        [max, mid, min].forEach((value, i) => {
-            const tx = x + w + 1;
-            const ty = y + yStep * i;
-
-            ctx.beginPath();
-            ctx.moveTo(tx, ty);
-            ctx.lineTo(tx + tickW, ty);
-            ctx.stroke();
-
-            ctx.textBaseline = i === 0 ? 'top' : i === 1 ? 'middle' : 'bottom';
-            ctx.fillText(`${value.toFixed(2)} ms`, tx + tickW + tickW, ty);
-        });
-    }
-
-    start() {
-        this.lastP = performance.now();
-    }
-
-    stop() {
-        const delta = performance.now() - this.lastP;
-        if (this.history.length > this.samples) {
-            this.history.pop();
-        }
-        this.history.unshift(delta);
-        this.min = Math.min(this.min, delta);
-        this.max = Math.max(this.max, delta);
-    }
-
-    getLast() {
-        return this.history[0] ?? 0;
-    }
-
-    getAverage() {
-        return this.history.reduce((acc, x) => acc + x, 0) / this.history.length;
-    }
-
-    getMin() {
-        return this.min;
-        //return this.history.reduce((acc, x) => Math.min(x, acc), this.history[0] ?? 0);
-    }
-
-    getMax() {
-        return this.max;
-        //return this.history.reduce((acc, x) => Math.max(x, acc), 0);
-    }
-}
 
 const calcPerf = new PerformanceCounter('Calculations');
 const drawPerf = new PerformanceCounter('Drawing');
@@ -331,8 +233,6 @@ function loop() {
 
             drawPerf.start();
 
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
             drawScene(rays);
             drawObjects(rays, OBJECTS);
 
@@ -348,12 +248,23 @@ function loop() {
                 drawStatusText(statusText);
             }
 
+            ctx.font = '10px sans-serif';
+            ctx.textBaseline = 'middle';
+
+            const positionText = `${player.x.toFixed(0)}, ${player.y.toFixed(0)}`;
+            const positionTextMeasurement = ctx.measureText(positionText);
+
+            ctx.fillStyle = 'rgba(0,0,0,.75)'
+            ctx.fillRect(0, SCREEN_HEIGHT - 20, positionTextMeasurement.width + 10, 20);
+            ctx.fillStyle = 'white';
+            ctx.fillText(positionText, 5, SCREEN_HEIGHT - 10);
+
             drawPerf.stop();
 
             // Draw performance calculators
             if (SHOW_PERF) {
-                calcPerf.draw(ctx, 'blue', 5, 5, SCREEN.width / 2, 50);
-                drawPerf.draw(ctx, 'red', 5, 5 + 50 + 20, SCREEN.width / 2, 50);
+                calcPerf.draw(ctx, 'blue', 'white', 5, 5, SCREEN_WIDTH / 2, 50);
+                drawPerf.draw(ctx, 'red', 'white', 5, 10 + 50, SCREEN_WIDTH / 2, 50);
             }
         }
 
@@ -552,7 +463,7 @@ function getVerticalCollision(angle, player) {
 function getRays(player) {
 
     const start = player.angle - FOV / 2;
-    const length = SCREEN.width;
+    const length = SCREEN_WIDTH;
     const step = FOV / length;
     const rays = [];
 
@@ -572,33 +483,50 @@ function movePlayer(delta) {
     // At 100 fps, delta is 10.
     const timeScale = 10 / delta;
 
-    if (!controls.strafe && controls.left) {
-        player.angle = fixAngle(player.angle - TURN_RADIUS * timeScale);
-    }
-    if (!controls.strafe && controls.right) {
-        player.angle = fixAngle(player.angle + TURN_RADIUS * timeScale);
-    }
-
-    const speed = controls.turbo ? MOVE_SPEEDS.fast : MOVE_SPEEDS.normal;
+    // Speed
 
     if (controls.up) {
-        player.speed = speed * timeScale;
+        if (controls.turbo) {
+            player.speed = MOVE_FAST * timeScale;
+        } else {
+            player.speed = MOVE_NORMAL * timeScale;
+        }
     }
 
     if (controls.down) {
-        player.speed = -MOVE_SPEEDS.slow * timeScale;
+        player.speed = -MOVE_SLOW * timeScale;
     }
 
     if (!controls.up && !controls.down) {
         player.speed = 0;
     }
 
-    if (controls.strafe && controls.left) {
-        player.side = MOVE_SPEEDS.slow * timeScale;
-    } else if (controls.strafe && controls.right) {
-        player.side = -MOVE_SPEEDS.slow * timeScale;
-    } else {
-        player.side = 0;
+    // Strafe
+
+    if (controls.strafe) {
+        if (controls.left) {
+            player.side = MOVE_SLOW * timeScale;
+        }
+
+        if (controls.right) {
+            player.side = -MOVE_SLOW * timeScale;
+        }
+
+        if (!controls.left && !controls.right) {
+            player.side = 0;
+        }
+    }
+
+
+    // Turning
+
+    if (!controls.strafe) {
+        if (controls.left) {
+            player.angle = fixAngle(player.angle - TURN_RADIUS * timeScale);
+        }
+        if (controls.right) {
+            player.angle = fixAngle(player.angle + TURN_RADIUS * timeScale);
+        }
     }
 
     if (controls.action) {
@@ -687,23 +615,23 @@ function drawScene(rays) {
         const ray = rays[i];
 
         const distance = viewCorrection(ray.distance, ray.angle, player.angle);
-        const wallHeight = WALL_HEIGHT / distance * 277;
-        const wallY = SCREEN.height / 2 - wallHeight / 2;
+        const height = WALL_HEIGHT / distance * 277;
+        const y = SCREEN_HEIGHT / 2 - height / 2;
 
         // Ceiling
         ctx.fillStyle = CEILING_COLOR;
-        ctx.fillRect(i, 0, 1, wallY);
+        ctx.fillRect(i, 0, 1, y);
 
         // Floor
         ctx.fillStyle = FLOOR_COLOR;
-        ctx.fillRect(i, wallY + wallHeight, 1, SCREEN.height / 2 + wallHeight / 2);
+        ctx.fillRect(i, y + height, 1, SCREEN_HEIGHT / 2 + height / 2);
 
         // Wall
         if (!RENDER_SPRITES || !ray.sprite) {
             ctx.fillStyle = ray.color;
-            ctx.fillRect(i, wallY, 1, wallHeight);
+            ctx.fillRect(i, y, 1, height);
         } else {
-            ctx.drawImage(spritesImage, ray.sprite.x + ray.spriteX, ray.sprite.y, 1, SPRITE_SIZE, i, wallY, 1, wallHeight);
+            ctx.drawImage(spritesImage, ray.sprite.x + ray.spriteX, ray.sprite.y, 1, SPRITE_SIZE, i, y, 1, height);
         }
     }
 }
@@ -719,12 +647,12 @@ function drawObjects(rays, objects) {
         }
 
         const angle = fixAngle(Math.atan2(object.y - player.y, object.x - player.x));
-        const size = WALL_HEIGHT / distance * 277;
-        const x = Math.floor(SCREEN.width / 2 - (player.angle - angle) * SCREEN.width / FOV - size / 2);
+        const height = WALL_HEIGHT / distance * 277;
+        const x = Math.floor(SCREEN_WIDTH / 2 - (player.angle - angle) * SCREEN_WIDTH / FOV - height / 2);
 
-        for (let i = 0; i < size; i++) {
+        for (let i = 0; i < height; i++) {
             if (x + i >= 0 && x + i < rays.length && rays[x + i].distance > distance) {
-                ctx.drawImage(spritesImage, object.sprite.x + Math.floor(SPRITE_SIZE / size * i), object.sprite.y, 1, SPRITE_SIZE, x + i, SCREEN.height / 2 - size / 2, 1, size);
+                ctx.drawImage(spritesImage, object.sprite.x + Math.floor(SPRITE_SIZE / height * i), object.sprite.y, 1, SPRITE_SIZE, x + i, SCREEN_HEIGHT / 2 - height / 2, 1, height);
             }
         }
     });
@@ -732,14 +660,14 @@ function drawObjects(rays, objects) {
 
 function drawMiniMap(map, rays, largeMap) {
 
-    const scale = Math.floor(MINIMAP_SCALE);
+    const scale = Math.floor(SCREEN_HEIGHT / MAP.length / 2);
     const width = map[0].length * scale;
     const height = map.length * scale;
-    const left = Math.floor(SCREEN.width / 2 - width / 2);
-    const top = Math.floor(SCREEN.height / 2 - height / 2);
+    const left = Math.floor(SCREEN_WIDTH / 2 - width / 2);
+    const top = Math.floor(SCREEN_HEIGHT / 2 - height / 2);
     const position = new Vector(player.x, player.y).multiply(scale).add(left, top);
     const radius = scale * MINIMAP_CELLRADIUS;
-    const translate = new Vector(0, 0).subtract(position).add(radius).add(scale, SCREEN.height - radius * 2 - scale);
+    const translate = new Vector(0, 0).subtract(position).add(radius).add(scale, SCREEN_HEIGHT - radius * 2 - scale);
 
 
     if (!largeMap) {
@@ -759,34 +687,50 @@ function drawMiniMap(map, rays, largeMap) {
 
     // Floors
     ctx.fillStyle = '#bbb';
-    ctx.fillRect(0, 0, screen.width, screen.height);
+    ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
 
     // Walls
-    iterateMap(map, (x, y, colorIndex) => {
-        if (colorIndex === 0) {
-            return;
-        }
-        ctx.fillStyle = MAP_LEGEND[colorIndex].color;
-        ctx.fillRect(left + x * scale, top + y * scale, scale, scale);
-    });
+    for (let y = 0; y < map.length; y++) {
+        for (let x = 0; x < map[0].length; x++) {
 
-    // Doors
-    iterateMap(DOOR_MAP, (x, y, colorIndex) => {
-        if (colorIndex === 0) {
-            return;
-        }
-        ctx.fillStyle = DOOR_MAP_LEGEND[colorIndex].color;
-        if (DOOR_MAP_LEGEND[colorIndex].inset) {
-            if (map[y - 1][x]) {
-                // Vertical door
-                ctx.fillRect(left + x * scale + scale / 3, top + y * scale, scale / 3, scale);
-            } else {
-                ctx.fillRect(left + x * scale, top + y * scale + scale / 3, scale, scale / 3);
+            const colorIndex = map[y][x];
+
+            if (colorIndex === 0) {
+                continue;
             }
-        } else {
+
+            ctx.fillStyle = MAP_LEGEND[colorIndex].color;
             ctx.fillRect(left + x * scale, top + y * scale, scale, scale);
         }
-    });
+
+    }
+
+    // Doors
+    for (let y = 0; y < DOOR_MAP.length; y++) {
+        for (let x = 0; x < DOOR_MAP[0].length; x++) {
+
+            const colorIndex = DOOR_MAP[y][x];
+            if (colorIndex === 0) {
+                continue;
+            }
+
+            const door = DOOR_MAP_LEGEND[colorIndex];
+
+            ctx.fillStyle = door.color;
+
+            if (door.inset) {
+                if (map[y - 1][x]) {
+                    // Vertical door
+                    ctx.fillRect(left + x * scale + scale / 3, top + y * scale, scale / 3, scale);
+                } else {
+                    ctx.fillRect(left + x * scale, top + y * scale + scale / 3, scale, scale / 3);
+                }
+            } else {
+                ctx.fillRect(left + x * scale, top + y * scale, scale, scale);
+            }
+        }
+
+    }
 
     // Rays
     if (MINIMAP_RAYS) {
@@ -838,7 +782,7 @@ function drawFps(fps) {
 
     const display = `${fps} FPS`;
     const size = ctx.measureText(display);
-    ctx.fillText(display, SCREEN.width - (size.width + 5), 5);
+    ctx.fillText(display, SCREEN_WIDTH - (size.width + 5), 5);
 }
 
 function drawStatusText(text) {

@@ -1,5 +1,7 @@
+import Vector from './vector';
+
 function buildLevel1() {
-    
+
     const walls = [
         '                            1111111111111                      ',
         '     222222                 1           1                      ',
@@ -207,7 +209,7 @@ function buildLevel1() {
 
     wallSprites.forEach(x => x.sprite = getSpriteVector(x.sprite));
     wallSprites.forEach(x => x.darkSprite = getSpriteVector(x.darkSprite));
-    
+
     doorSprites.forEach(x => x.sprite = getSpriteVector(x.sprite));
     doorSprites.forEach(x => x.darkSprite = getSpriteVector(x.darkSprite));
     doorSprites.forEach(x => x.frameSprite = getSpriteVector(x.frameSprite));
@@ -230,8 +232,6 @@ function buildLevel1() {
     };
 }
 
-const LEVEL_1 = buildLevel1();
-
 function mapLiteralToMapIndex(y) {
     return y.split('').map(x => parseInt(x === ' ' || x === '-' ? '0' : x));
 }
@@ -239,3 +239,7 @@ function mapLiteralToMapIndex(y) {
 function getSpriteVector(index, w = 16) {
     return new Vector(index % w, Math.floor(index / w)).multiply(65);
 }
+
+const LEVEL_1 = buildLevel1();
+
+export default LEVEL_1;

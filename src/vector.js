@@ -1,4 +1,4 @@
-class Vector {
+export default class Vector {
 
     constructor(x, y) {
       if (x instanceof Vector) {

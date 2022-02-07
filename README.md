@@ -1,22 +1,34 @@
-# Map
+# Utveckling
 
-The map is made of a raw image data file. The size has to be provided upon loading in order to arrange the pixels correctly.
-Currently black is the floor, and any other color is a wall.
+Installera dependecies:
+```
+npm install
+```
 
-Idea is to eventually have specific colors represent game objects and separate textures.
+Kör:
+```
+npm run dev
+```
 
-Level 1 = 63 x 57
+Bygg:
+```
+npm build
+```
 
-# Ideas
 
-- Ibland kör spelet i 100 FPS och ibland runt 60 FPS. Har implementerat tidsskalning, men det verkar inte fungera.
-- Bekräfta hurvida det fungerar genom att implementera en timer som startar på viss position och slutar på en annan.
-- Kan vi läsa t.ex. Bitmap-filer?
+# Backlog
+
+- Gör spelmotorn skalbar, d.v.s att du kan rendera den i valfri upplösning och på valfri position på en canvas.
+    - Med det kan vi implementera ett redigeringsverktyg för nivåer med förhandsgranskning på samma skärm.
+- Lägg till animerade dörrar.
+- Lägg till lönndörrar, väggar som kan flytta på sig.
+- Lägg till samlingsbara objekt, t.ex. pengar, ammunition, första hjälpen-kit...
+- Renderingen av sprite-objekt är buggig.
+    - Från vissa vinklar renderas inte objekten.
+    - De bör sorteras på avstånd och renderas i rätt ordning.
 
 # Documentation / Inspiration
 
 3DSage på YouTube har exempel på hur man renderar sprites i 3D-rymd.
 
 http://wademcgillis.com/html5games/Wolfenstein3D/
-
-
