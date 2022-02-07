@@ -22,6 +22,7 @@ const MOVE_SPEEDS = {
 const TURN_RADIUS = Math.PI / 180 * 1.5;
 
 let SHOW_FPS = JSON.parse(localStorage.getItem('SHOW_FPS')) ?? true;
+let SHOW_PERF = JSON.parse(localStorage.getItem('SHOW_PERF')) ?? true;
 let RENDER_SPRITES = JSON.parse(localStorage.getItem('RENDER_SPRITES')) ?? true;
 let INTERLACED_RENDERING = JSON.parse(localStorage.getItem('INTERLACED_RENDERING')) ?? true;
 
@@ -30,17 +31,18 @@ const MAP = LEVEL_1.map;
 const MAP_LEGEND = LEVEL_1.legend;
 const DOOR_MAP = LEVEL_1.doors;
 const DOOR_MAP_LEGEND = LEVEL_1.doorsLegend;
+const OBJECTS_MAP = LEVEL_1.objects;
+const OBJECTS_MAP_LEGEND = LEVEL_1.objectsLegend;
 
-const OBJECTS = MAP.flatMap((row, y) => row.map((item, x) => ({
+const OBJECTS = OBJECTS_MAP.flatMap((row, y) => row.map((item, x) => ({
+    id: item,
     x: (x + .5) * CELLSIZE,
     y: (y + .5) * CELLSIZE,
-    ...MAP_LEGEND[item]
-}))).filter(x => x.object);
+    ...OBJECTS_MAP_LEGEND[item]
+}))).filter(x => x.id);
 
 const spritesImage = new Image();
 spritesImage.src = LEVEL_1.spriteUrl;
-
-
 
 const MINIMAP_ALPHA = .9;
 const MINIMAP_SCALE = SCREEN.height / MAP.length / CELLSIZE / 2;
@@ -95,6 +97,8 @@ const controlsKeyboardMap = {
     KeyA: 'left',
     KeyS: 'down',
     KeyD: 'right',
+    KeyQ: ['strafe', 'left'],
+    KeyE: ['strafe', 'right'],
     ArrowUp: 'up',
     ArrowLeft: 'left',
     ArrowDown: 'down',
@@ -122,7 +126,8 @@ const controlsKeyboardSpecialMap = {
         }
     },
     KeyU: () => SHOW_FPS = !SHOW_FPS,
-    'KeyI': () => {
+    KeyC: () => SHOW_PERF = !SHOW_PERF,
+    KeyI: () => {
         INTERLACED_RENDERING = !INTERLACED_RENDERING
         setStatusText('INTERLACING ' + (INTERLACED_RENDERING ? 'ON' : 'OFF'));
     },
@@ -140,14 +145,26 @@ const controlsKeyboardSpecialMap = {
 
 document.addEventListener('keydown', (e) => {
     if (e.code in controlsKeyboardMap) {
-        controls[controlsKeyboardMap[e.code]] = true;
+        if (Array.isArray(controlsKeyboardMap[e.code])) {
+            controlsKeyboardMap[e.code].forEach(key => {
+                controls[key] = true;    
+            });
+        } else {
+            controls[controlsKeyboardMap[e.code]] = true;
+        }
     }
 });
 
 document.addEventListener('keyup', (e) => {
 
     if (e.code in controlsKeyboardMap) {
-        controls[controlsKeyboardMap[e.code]] = false;
+        if (Array.isArray(controlsKeyboardMap[e.code])) {
+            controlsKeyboardMap[e.code].forEach(key => {
+                controls[key] = false;
+            });
+        } else {
+            controls[controlsKeyboardMap[e.code]] = false;
+        }
     }
     if (e.code in controlsKeyboardToggleMap) {
         controls[controlsKeyboardToggleMap[e.code]] = !controls[controlsKeyboardToggleMap[e.code]];
@@ -186,9 +203,76 @@ let frameCounter = 0;
 let last = performance.now();
 
 class PerformanceCounter {
-    constructor(samples = 1000) {
+
+    constructor(name, samples = 1000) {
+        this.name = name;
         this.samples = samples;
+        this.min = 0;
+        this.max = 0;
         this.history = [];
+    }
+
+    /**
+     * 
+     * @param {CanvasRenderingContext2D} ctx 
+     * @param {*} color 
+     * @param {*} x 
+     * @param {*} y 
+     * @param {*} w 
+     * @param {*} h 
+     */
+    draw(ctx, color, x, y, w, h) {
+
+        const max = this.getMax();
+        const min = this.getMin();
+        const mid = min + (max - min) / 2;
+        const avg = this.getAverage();
+
+        // Draw the Line Chart
+        const wScale = (w - 2) / this.samples;
+        const hScale = (h - 2) / max - min;
+
+        ctx.strokeStyle = color;
+        ctx.beginPath();
+        for (let index = 0; index < this.history.length; index++) {
+            const ly = this.history[index];
+            ctx.lineTo((x + 1) + wScale * index, y + 1 + h - 2 - ly * hScale);
+        }
+
+        ctx.stroke();
+
+        // Draw the texts
+        const fontSize = h / 6;
+        const tickW = 3;
+
+        ctx.strokeStyle = 'white';
+        ctx.fillStyle = 'white';
+        ctx.font = `${fontSize}px sans-serif`;
+        ctx.textBaseline = 'middle';
+        ctx.lineWidth = 1;
+
+        ctx.strokeRect(x, y, w, h);
+
+        ctx.fillText(this.name, x + fontSize / 2, y + fontSize);
+
+        const avgTxt = `Value: ${this.history[0]?.toFixed(2)} ms | Avg: ${avg.toFixed(2)} ms`;
+        const avgW = ctx.measureText(avgTxt).width;
+        ctx.fillText(avgTxt, x + w - 2 - avgW - fontSize / 4, y + fontSize);
+
+        const yStep = h / 2;
+
+        [max, mid, min].forEach((value, i) => {
+            const tx = x + w + 1;
+            const ty = y + yStep * i;
+
+            ctx.beginPath();
+            ctx.moveTo(tx, ty);
+            ctx.lineTo(tx + tickW, ty);
+            ctx.stroke();
+
+            ctx.textBaseline = i === 0 ? 'top' : i === 1 ? 'middle' : 'bottom';
+            ctx.fillText(`${value.toFixed(2)} ms`, tx + tickW + tickW, ty);
+        });
     }
 
     start() {
@@ -201,6 +285,8 @@ class PerformanceCounter {
             this.history.pop();
         }
         this.history.unshift(delta);
+        this.min = Math.min(this.min, delta);
+        this.max = Math.max(this.max, delta);
     }
 
     getLast() {
@@ -212,17 +298,18 @@ class PerformanceCounter {
     }
 
     getMin() {
-        if (!this.history.length) return 0;
-        return this.history.reduce((acc, x) => Math.min(x, acc), this.history[0]);
+        return this.min;
+        //return this.history.reduce((acc, x) => Math.min(x, acc), this.history[0] ?? 0);
     }
 
     getMax() {
-        return this.history.reduce((acc, x) => Math.max(x, acc), 0);
+        return this.max;
+        //return this.history.reduce((acc, x) => Math.max(x, acc), 0);
     }
 }
 
-const calcPerf = new PerformanceCounter();
-const drawPerf = new PerformanceCounter();
+const calcPerf = new PerformanceCounter('Calculations');
+const drawPerf = new PerformanceCounter('Drawing');
 
 function loop() {
 
@@ -245,7 +332,7 @@ function loop() {
             drawPerf.start();
 
             drawScene(rays);
-            drawSprite(rays, OBJECTS);
+            drawObjects(rays, OBJECTS);
 
             if (controls.map > 0) {
                 drawMiniMap(MAP, rays, controls.map === MINIMAP_LARGE);
@@ -253,7 +340,6 @@ function loop() {
 
             if (SHOW_FPS) {
                 drawFps(fps.tick());
-                drawPerformance();
             }
 
             if (statusText) {
@@ -261,6 +347,12 @@ function loop() {
             }
 
             drawPerf.stop();
+
+            // Draw performance calculators
+            if (SHOW_PERF) {
+                calcPerf.draw(ctx, 'blue', 5, 5, SCREEN.width / 2, 50);
+                drawPerf.draw(ctx, 'red', 5, 5 + 50 + 20, SCREEN.width / 2, 50);
+            }
         }
 
         requestAnimationFrame(loop);
@@ -271,6 +363,21 @@ function loop() {
 
 function startGame() {
     requestAnimationFrame(loop);
+}
+
+/**
+ * Keeps the angle between -Math.PI and Math.PI. Required to be able to compare angles.
+ * @param {number} angle 
+ */
+function fixAngle(angle) {
+
+    if (angle < -Math.PI) {
+        return angle + 2.0 * Math.PI;
+    }
+    if (angle > Math.PI) {
+        return angle - 2.0 * Math.PI;
+    }
+    return angle;
 }
 
 function viewCorrection(distance, viewAngle, playerAngle) {
@@ -599,6 +706,28 @@ function drawScene(rays) {
     }
 }
 
+function drawObjects(rays, objects) {
+
+    objects.forEach(object => {
+
+        const distance = Vector.distance(player.x, player.y, object.x, object.y);
+
+        if (distance < CELLSIZE / 2) {
+            return;
+        }
+
+        const angle = fixAngle(Math.atan2(object.y - player.y, object.x - player.x));
+        const size = ((CELLSIZE * WALL_HEIGHT) / distance) * 277;
+        const x = Math.floor(SCREEN.width / 2 - (player.angle - angle) * SCREEN.width / FOV - size / 2);
+
+        for (let i = 0; i < size; i++) {
+            if (x + i >= 0 && x + i < rays.length && rays[x + i].distance > distance) {
+                ctx.drawImage(spritesImage, object.sprite.x + Math.floor(64 / size * i), object.sprite.y, 1, 64, x + i, SCREEN.height / 2 - size / 2, 1, size);
+            }
+        }
+    });
+}
+
 function drawMiniMap(map, rays, largeMap) {
 
     // Use .floor to work with even numbers.
@@ -713,83 +842,12 @@ function drawFps(fps) {
     ctx.fillText(display, SCREEN.width - (size.width + 5), 5);
 }
 
-function drawPerformance() {
-    ctx.font = OSD_FONT;
-    ctx.fillStyle = OSD_COLOR;
-    ctx.textBaseline = 'top'
-
-    let display = `Calculations: ${calcPerf.getLast().toFixed(2)}, ${calcPerf.getAverage().toFixed(2)} MS`;
-    let size = ctx.measureText(display);
-    ctx.fillText(display, SCREEN.width - (size.width + 5), 30);
-
-    display = `Drawing: ${drawPerf.getLast().toFixed(2)}, ${drawPerf.getAverage().toFixed(2)} MS`;
-    size = ctx.measureText(display);
-    ctx.fillText(display, SCREEN.width - (size.width + 5), 60);
-
-
-
-    ctx.strokeStyle = OSD_COLOR;
-    function drawPerformaceChart(drawPerf, top) {
-        ctx.strokeRect(0, top, 1000, 50);
-
-        ctx.beginPath()
-        ctx.moveTo(0, top + 50);
-
-        for (let index = 0; index < drawPerf.history.length; index++) {
-            const y = drawPerf.history[index];
-            ctx.lineTo(index, top + 50 - y);
-        }
-
-        ctx.stroke();
-    }
-
-    drawPerformaceChart(calcPerf, 0);
-    drawPerformaceChart(drawPerf, 50);
-}
-
 function drawStatusText(text) {
     ctx.font = OSD_FONT;
     ctx.fillStyle = OSD_COLOR;
     ctx.textBaseline = 'top'
 
     ctx.fillText(text, 5, 5);
-}
-
-/**
- * Keeps the angle between -Math.PI and Math.PI. Required to be able to compare angles.
- * @param {number} angle 
- */
-function fixAngle(angle) {
-    if (angle < -Math.PI) {
-        return angle + 2.0 * Math.PI;
-    }
-    if (angle > Math.PI) {
-        return angle - 2.0 * Math.PI;
-    }
-    return angle;
-}
-
-
-function drawSprite(rays, objects) {
-
-    objects.forEach(object => {
-
-        const distance = Vector.distance(player.x, player.y, object.x, object.y);
-
-        if (distance < CELLSIZE * .5) {
-            return;
-        }
-
-        const angle = fixAngle(Math.atan2(object.y - player.y, object.x - player.x));
-        const size = ((CELLSIZE * WALL_HEIGHT) / distance) * 277;
-        const x = Math.floor(SCREEN.width / 2 - (player.angle - angle) * SCREEN.width / FOV - size / 2);
-
-        for (let i = 0; i < size; i++) {
-            if (x + i >= 0 && x + i < rays.length && rays[x + i].distance > distance) {
-                ctx.drawImage(spritesImage, MAP_LEGEND[8].sprite.x + Math.floor(64 / size * i), MAP_LEGEND[8].sprite.y, 1, 64, x + i, SCREEN.height / 2 - size / 2, 1, size);
-            }
-        }
-    });
 }
 
 spritesImage.onload = () => {
@@ -817,7 +875,6 @@ spritesImage.onload = () => {
         if (data[i] === 152 && data[i + 1] === 0 & data[i + 2] === 136) {
             data[i + 3] = 0;
         }
-
     }
 
     // Place the modifed image data onto the canvas.

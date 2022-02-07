@@ -140,12 +140,81 @@ function buildLevel1() {
         { color: '#cccccc', darkColor: '#dddddd', sprite: 24, darkSprite: 25, frameColor: '', frameDarkColor: '', frameSprite: -1, frameDarkSprite: -1 }, // Elevator Door
     ];
 
+    const objects = [
+        '                            -------------                      ',
+        '     ------                 -           -                      ',
+        '     -    -      ------------           -----                  ',
+        '     -    -      -          -           -   -                  ',
+        '     -     -     -                          -                  ',
+        '     -     -     -          -           -   -                  ',
+        '     ----- ----- -   --------           -----                  ',
+        '     -         - -   -      -           -                      ',
+        '     -         ---   ---     ----- ------                      ',
+        '     -         -       -        -   -                          ',
+        '     -                 -        -   -                          ',
+        '     -         -       -        -   -                          ',
+        '------         ---------        -   -                          ',
+        '-   --         -                -   -                          ',
+        '-   ------ ----            ------   ---                        ',
+        '-   -   -   -              -          -                        ',
+        '-- --   -   -              -  ---   ---                        ',
+        '-   -----   -              -  ---   -                          ',
+        '-   -   -   -              -  ---   -                          ',
+        '-       -   -              ------   -                          ',
+        '-   -   -   -                   -   -                          ',
+        '-   ------ -----                -- --                ----------',
+        '-   --         -          ------     -------         -        -',
+        '-   --         -          -               --         -        -',
+        '-   --         -          -               ------------        -',
+        '-    -         -          -                -         -        -',
+        '-              -          -                                   -',
+        '-    -         -          -                -         -        -',
+        '-   --         -          -               ----    ----        -',
+        '-   --         -          -               -----  -   -        -',
+        '-   --         -          ------     ------   -  -   -        -',
+        '-   ------ -----               --- --         -  -   --- -- ---',
+        '-   -----   -                   -   -         -  -      -  -   ',
+        '-   -----   -                   -   -         -  -             ',
+        '-   -   -   -                   -   -         -  -  - - - -    ',
+        '-       -   -                   -   -         -  --- - - - --  ',
+        '-   -   -   -                   -   -         -   -         -  ',
+        '-   -----   -                   -   -         -             -  ',
+        '-   -----   -------------       -   -         -   -         -  ',
+        '-                -      ---     -   -         ------ - - - --  ',
+        '-                         -     -   -               - - - -    ',
+        '-                -      ---     -   -                          ',
+        '------------------ ------       -   -                          ',
+        '          --  -     -      ------- -------                     ',
+        '         -    -  - -       -    -   -    -                     ',
+        '          --     --        -             -                     ',
+        '            - ----         -    -   -    -                     ',
+        '            -  -           -    -   -    -                     ',
+        '            -  -           ------   ------                     ',
+        '            ----           -    -   -    -                     ',
+        '                           -             -                     ',
+        '                           -    -   -    -                     ',
+        '                           ------   ------                     ',
+        '                           -             -                     ',
+        '                           -  1        1 -                     ',
+        '                           -             -                     ',
+        '                           ---------------                     '
+    ];
+
+    const objectSprites = [
+        { sprite: -1 },  // Space
+        { sprite: 116 }, // Tree
+    ];
+
     wallSprites.forEach(x => x.sprite = getSpriteVector(x.sprite));
     wallSprites.forEach(x => x.darkSprite = getSpriteVector(x.darkSprite));
+    
     doorSprites.forEach(x => x.sprite = getSpriteVector(x.sprite));
     doorSprites.forEach(x => x.darkSprite = getSpriteVector(x.darkSprite));
     doorSprites.forEach(x => x.frameSprite = getSpriteVector(x.frameSprite));
     doorSprites.forEach(x => x.frameDarkSprite = getSpriteVector(x.frameDarkSprite));
+
+    objectSprites.forEach(x => x.sprite = getSpriteVector(x.sprite));
+    objectSprites.forEach(x => x.darkSprite = getSpriteVector(x.darkSprite));
 
     return {
         /**
@@ -155,6 +224,8 @@ function buildLevel1() {
         legend: wallSprites,
         doors: doors.map(mapLiteralToMapIndex),
         doorsLegend: doorSprites,
+        objects: objects.map(mapLiteralToMapIndex),
+        objectsLegend: objectSprites,
         spriteUrl: 'sprites.png'
     };
 }
