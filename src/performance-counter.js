@@ -35,19 +35,12 @@ export default class PerformanceCounter {
         // The width of the graph is the total width of the widget minus the width of the axis labels.
         const graphWidth = width - axisLabelWidth;
 
-        // Draw the name
-        ctx.font = `${axisLabelFontSize}px sans-serif`;
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'top';
-        ctx.fillStyle = textColor;
-
-        ctx.fillText(this.name, x + padding, y + padding);
-
         // Draw the axis labels.
         const axisLabelYStep = height / 2;
 
-        ctx.strokeStyle = textColor;
+        ctx.font = `${axisLabelFontSize}px monospace`;
         ctx.textAlign = 'right';
+        ctx.strokeStyle = textColor;
 
         [max, mid, min].forEach((value, i) => {
 
@@ -62,11 +55,11 @@ export default class PerformanceCounter {
 
             ctx.textBaseline = i === 0 ? 'top' : i === 1 ? 'middle' : 'bottom';
 
-            ctx.fillText(`${value.toFixed(2)} ms`, axisLabelX, axisLabelTickY);
+            ctx.fillText(`${value.toFixed(2)} MS`, axisLabelX, axisLabelTickY);
         });
 
         // Draw the frame
-        ctx.fillStyle = '#00000033';
+        ctx.fillStyle = '#00000099';
         ctx.fillRect(x, y, graphWidth, height)
 
         ctx.lineWidth = 1;
@@ -81,15 +74,23 @@ export default class PerformanceCounter {
 
         ctx.lineWidth = .5;
         ctx.strokeStyle = lineColor;
-        
+
         ctx.moveTo(x + 1, y + height - 1);
-        ctx.beginPath();       
+        ctx.beginPath();
 
         for (let i = 0; i < this.history.length; i++) {
             ctx.lineTo(graphLeft + graphScaleX * i, graphBottom - (this.history[i] - min) / diffY * graphHeight);
         }
 
         ctx.stroke();
+
+        // Draw the name
+        ctx.font = `${axisLabelFontSize}px monospace`;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+
+        ctx.fillStyle = textColor;
+        ctx.fillText(this.name.toUpperCase(), x + padding, y + padding);
     }
 
     start() {

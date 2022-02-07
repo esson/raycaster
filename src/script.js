@@ -25,8 +25,11 @@ const SPRITE_SIZE = 64;
 const CEILING_COLOR = '#333';
 const FLOOR_COLOR = '#777';
 
-const OSD_COLOR = '#0f0';
-const OSD_FONT = '20px sans-serif';
+const OSD_BACKGORUND = '#00000033';
+const OSD_COLOR = '#fff';
+const OSD_FONT = '12px monospace';
+const OSD_HEIGHT = 20;
+const OSD_MIDDLE = OSD_HEIGHT / 2;
 
 const MOVE_SLOW = .02;
 const MOVE_NORMAL = .04;
@@ -59,11 +62,11 @@ const PLAYER_DEFAULT = {
 
 let SHOW_FPS = JSON.parse(localStorage.getItem('SHOW_FPS')) ?? true;
 let SHOW_PERF = JSON.parse(localStorage.getItem('SHOW_PERF')) ?? true;
-let SHOW_COORDINATES = JSON.parse(localStorage.getItem('SHOW_COORDINATES')) ?? true;
+let SHOW_COORDS = JSON.parse(localStorage.getItem('SHOW_COORDS')) ?? true;
 let RENDER_SPRITES = JSON.parse(localStorage.getItem('RENDER_SPRITES')) ?? true;
-let INTERLACED_RENDERING = JSON.parse(localStorage.getItem('INTERLACED_RENDERING')) ?? true;
+let RENDER_INTERLACED = JSON.parse(localStorage.getItem('RENDER_INTERLACED')) ?? true;
 
-// Level
+// Level / Map / Doors / Objects
 //
 
 const currentLevel = {
@@ -77,8 +80,8 @@ const currentLevel = {
     spawn: new Vector(30.5, 50.5)
 };
 
-const MAP = LEVEL_1.map;
-const MAP_LEGEND = LEVEL_1.legend;
+const WALLS = LEVEL_1.walls;
+const WALLS_LEGEND = LEVEL_1.wallsLegend;
 const DOOR_MAP = LEVEL_1.doors;
 const DOOR_MAP_LEGEND = LEVEL_1.doorsLegend;
 const OBJECTS_MAP = LEVEL_1.objects;
@@ -91,8 +94,54 @@ const OBJECTS = OBJECTS_MAP.flatMap((row, y) => row.map((item, x) => ({
     ...OBJECTS_MAP_LEGEND[item]
 }))).filter(x => x.id);
 
-const spritesImage = new Image();
-spritesImage.src = LEVEL_1.spriteUrl;
+// Spritesheet
+//
+
+const spritesheet = new Image();
+spritesheet.src = LEVEL_1.spriteUrl;
+spritesheet.onload = () => {
+
+    // Remove the loader to prevent looping behaviour.
+    spritesheet.onload = null;
+
+    // The sprite image doesn't contain opacity data, 
+    // so we need to turn all pink colors to 0 alpha.
+    // To do that we create a canvas and draw the 
+    // spritesheet onto it. Then we can get the image data
+    // from the canvas and modify it, put the modified
+    // data back onto the canvas and get a Data URL to
+    // apply to the spritesheet ImageElement.
+
+    const canvas = document.createElement('canvas');
+    canvas.width = spritesheet.width;
+    canvas.height = spritesheet.height;
+
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(spritesheet, 0, 0);
+
+    const imageData = ctx.getImageData(0, 0, spritesheet.width, spritesheet.height);
+    const data = imageData.data;
+
+    // Convert rgba(152, 0, 136, 255) to transparent.
+    for (let i = 0; i < data.length; i += 4) {
+
+        if (data[i] !== 152 || data[i + 1] !== 0 || data[i + 2] !== 136) {
+            continue;
+        }
+
+        data[i + 3] = 0;
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    spritesheet.src = canvas.toDataURL();
+
+    canvas.remove();
+
+    startGame();
+};
+
+// Canvas
+//
 
 /**
  * @type HTMLCanvasElement
@@ -104,22 +153,29 @@ canvas.height = SCREEN_HEIGHT;
 var ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false;
 
-let statusText = null;
-let statusTimeoutId;
+// Messages
+//
 
-function clearStatusText() {
-    statusText = null;
-}
+let messageText = null;
+let messageTextTimeoutId;
 
-function setStatusText(text) {
-    statusText = text;
+function setMessageText(messageOrSettingName, settingValue) {
 
-    if (statusTimeoutId) {
-        clearTimeout(statusTimeoutId);
+    if (typeof settingValue === 'undefined') {
+        messageText = messageOrSettingName;
+    } else {
+        messageText = `${messageOrSettingName} ${settingValue ? 'ON' : 'OFF'}`;
     }
 
-    statusTimeoutId = setTimeout(clearStatusText, 1500);
+    if (messageTextTimeoutId) {
+        clearTimeout(messageTextTimeoutId);
+    }
+
+    messageTextTimeoutId = setTimeout(() => messageText = null, 1500);
 }
+
+// Keyboard
+//
 
 const controls = {
     up: false,
@@ -134,7 +190,7 @@ const controls = {
     pause: false
 };
 
-const controlsKeyboardMap = {
+const keyboardToControlMap = {
     KeyW: 'up',
     KeyA: 'left',
     KeyS: 'down',
@@ -147,11 +203,11 @@ const controlsKeyboardMap = {
     Space: 'action'
 };
 
-const controlsKeyboardToggleMap = {
-    KeyP: 'pause'
+const keyboardToControlToggleMap = {
+    Escape: 'pause'
 };
 
-const controlsKeyboardSpecialMap = {
+const keyboardToFunctionMap = {
     // Toggle Mini-Map
     KeyM: () => {
         switch (controls.map) {
@@ -162,66 +218,81 @@ const controlsKeyboardSpecialMap = {
                 controls.map = MINIMAP_LARGE;
                 break;
             case MINIMAP_LARGE:
-                controls.map = MINIMAP_SMALL; // Never toggle to SMALL for now
+                controls.map = MINIMAP_SMALL; // Never toggle to NONE for now
                 break;
         }
     },
     // Toggle FPS
     KeyU: () => SHOW_FPS = !SHOW_FPS,
     // Toggle Performance
-    KeyC: () => SHOW_PERF = !SHOW_PERF,
+    KeyC: () => setMessageText('PERFORMANCE GRAPH', SHOW_PERF = !SHOW_PERF),
     // Toggle Interlacing
-    KeyI: () => {
-        INTERLACED_RENDERING = !INTERLACED_RENDERING
-        setStatusText('INTERLACING ' + (INTERLACED_RENDERING ? 'ON' : 'OFF'));
-    },
+    KeyI: () => setMessageText('INTERLACING', RENDER_INTERLACED = !RENDER_INTERLACED),
     // Toggle Sprites
-    KeyO: () => {
-        RENDER_SPRITES = !RENDER_SPRITES
-        setStatusText('SPRITES ' + (RENDER_SPRITES ? 'ON' : 'OFF'));
-    },
+    KeyO: () => setMessageText('SPRITES', RENDER_SPRITES = !RENDER_SPRITES),
     // Reset
-    KeyR: () => player = { ...PLAYER_DEFAULT },
+    KeyR: () => (setMessageText('PLAYER RESET'), player = { ...PLAYER_DEFAULT }),
     // Toggle Smoothing
-    KeyL: () => ctx.imageSmoothingEnabled = !ctx.imageSmoothingEnabled
+    KeyL: () => setMessageText('SMOOTHING', ctx.imageSmoothingEnabled = !ctx.imageSmoothingEnabled)
 }
 
 document.addEventListener('keydown', (e) => {
-    // Set true by keyboard map
-    if (e.code in controlsKeyboardMap) {
-        controls[controlsKeyboardMap[e.code]] = true;
+
+    // Set false on controls
+    if (e.code in keyboardToControlMap) {
+        controls[keyboardToControlMap[e.code]] = true;
     }
 });
 
 document.addEventListener('keyup', (e) => {
-    // Set false by keyboard map
-    if (e.code in controlsKeyboardMap) {
-        controls[controlsKeyboardMap[e.code]] = false;
+
+    // Set false on controls
+    if (e.code in keyboardToControlMap) {
+        controls[keyboardToControlMap[e.code]] = false;
     }
-    // Toggle true/false by keyboard map
-    if (e.code in controlsKeyboardToggleMap) {
-        controls[controlsKeyboardToggleMap[e.code]] = !controls[controlsKeyboardToggleMap[e.code]];
+
+    // Toggle boolean on controls
+    if (e.code in keyboardToControlToggleMap) {
+        controls[keyboardToControlToggleMap[e.code]] = !controls[keyboardToControlToggleMap[e.code]];
     }
-    // Map to special logic
-    if (e.code in controlsKeyboardSpecialMap) {
-        controlsKeyboardSpecialMap[e.code]();
+
+    // Trigger function
+    if (e.code in keyboardToFunctionMap) {
+        keyboardToFunctionMap[e.code]();
     }
 });
 
+// State Save
+//
+
 window.addEventListener('unload', (e) => {
+
     localStorage.setItem('player', JSON.stringify(player));
+
     localStorage.setItem('SHOW_FPS', JSON.stringify(SHOW_FPS));
-    localStorage.setItem('INTERLACED_RENDERING', JSON.stringify(INTERLACED_RENDERING));
+    localStorage.setItem('SHOW_COORDS', JSON.stringify(SHOW_COORDS));
+    localStorage.setItem('SHOW_PERF', JSON.stringify(SHOW_PERF));
+
+    localStorage.setItem('RENDER_INTERLACED', JSON.stringify(RENDER_INTERLACED));
     localStorage.setItem('RENDER_SPRITES', JSON.stringify(RENDER_SPRITES));
 });
 
+// Player
+//
 let player = JSON.parse(localStorage.getItem('player')) ?? { ...PLAYER_DEFAULT };
+
+// Game Loop
+//
+
+function startGame() {
+    requestAnimationFrame(loop);
+}
 
 /**
  * Increases on each frame, used to render with interlaced vertical lines.
  */
 let frameCounter = 0;
-let last = performance.now();
+let lastPerf = performance.now();
 
 const calcPerf = new PerformanceCounter('Calculations');
 const drawPerf = new PerformanceCounter('Drawing');
@@ -229,12 +300,13 @@ const drawPerf = new PerformanceCounter('Drawing');
 function loop() {
 
     const now = performance.now();
-    const delta = now - last;
+    const delta = now - lastPerf;
 
-    last = now;
+    lastPerf = now;
     frameCounter++;
 
     try {
+
         if (!controls.pause) {
 
             let rays;
@@ -265,39 +337,42 @@ function loop() {
         }
 
         requestAnimationFrame(loop);
+
     } catch (error) {
         throw error;
     }
 }
 
 function update(delta) {
+
     movePlayer(delta);
 }
 
 function render(rays) {
 
-    drawScene(rays);
-    drawObjects(rays, OBJECTS);
+    renderScene(rays);
+    renderObjects(rays, OBJECTS);
 
     if (controls.map > MINIMAP_NONE) {
-        drawMiniMap(MAP, rays, controls.map === MINIMAP_LARGE);
+        renderMap(WALLS, rays, controls.map === MINIMAP_LARGE);
     }
 
-    if (SHOW_FPS) {
-        drawFps(fps.tick());
-    }
+    if (SHOW_FPS || messageText || SHOW_COORDS) {
+     
+        renderOsd();
+     
+        if (SHOW_FPS) {
+            renderFps(fps.tick());
+        }
 
-    if (statusText) {
-        drawStatusText(statusText);
-    }
+        if (messageText) {
+            renderMessage(messageText);
+        }
 
-    if (SHOW_COORDINATES) {
-        drawCoordinates();
+        if (SHOW_COORDS) {
+            renderCoordinates();
+        }
     }
-}
-
-function startGame() {
-    requestAnimationFrame(loop);
 }
 
 /**
@@ -309,18 +384,28 @@ function fixAngle(angle) {
     if (angle < -PI) {
         return angle + DOUBLE_PI;
     }
+
     if (angle > PI) {
         return angle - DOUBLE_PI;
     }
+
     return angle;
 }
 
-function viewCorrection(distance, viewAngle, playerAngle) {
+/**
+ * Corrects the provided distance to compensate for fish-eye effect.
+ * @param {number} distance The ray distance.
+ * @param {number} viewAngle The ray angle.
+ * @param {number} playerAngle The player angle.
+ */
+function getViewCorrectedDistance(distance, viewAngle, playerAngle) {
+
     const difference = viewAngle - playerAngle;
     return distance * Math.cos(difference);
 }
 
 function isOutOfBounds(sx, sy, dw, dh) {
+
     return sx < 0 || sx >= dw || sy < 0 || sy >= dh;
 }
 
@@ -339,23 +424,26 @@ function getHorizontalCollision(angle, player) {
 
     let wall;
     let door;
+
     let nextX = mapX;
     let nextY = mapY;
 
     let color;
     let sprite;
 
-    while (!wall && !door) {
+    while (true) {
+
         const cellX = Math.floor(nextX);
         const cellY = up ? Math.floor(nextY) - 1 : Math.floor(nextY);
 
-        if (isOutOfBounds(cellX, cellY, MAP[0].length, MAP.length)) {
-            color = MAP_LEGEND[0]?.darkColor;
-            sprite = MAP_LEGEND[0]?.darkSprite;
+        if (isOutOfBounds(cellX, cellY, WALLS[0].length, WALLS.length)) {
+            color = WALLS_LEGEND[0]?.darkColor;
+            sprite = WALLS_LEGEND[0]?.darkSprite;
+
             break;
         }
 
-        wall = MAP[cellY][cellX];
+        wall = WALLS[cellY][cellX];
 
         if (wall) {
             // If cell is adjacent to wall, we render door frame
@@ -365,8 +453,8 @@ function getHorizontalCollision(angle, player) {
                 color = DOOR_MAP_LEGEND[adjacentDoor]?.frameDarkColor;
                 sprite = DOOR_MAP_LEGEND[adjacentDoor]?.frameDarkSprite;
             } else {
-                color = MAP_LEGEND[wall]?.darkColor;
-                sprite = MAP_LEGEND[wall]?.darkSprite;
+                color = WALLS_LEGEND[wall]?.darkColor;
+                sprite = WALLS_LEGEND[wall]?.darkSprite;
             }
 
             break;
@@ -418,23 +506,26 @@ function getVerticalCollision(angle, player) {
 
     let wall;
     let door;
+
     let nextX = mapX;
     let nextY = mapY;
 
     let color;
     let sprite;
 
-    while (!wall && !door) {
+    while (true) {
+
         const cellX = right ? Math.floor(nextX) : Math.floor(nextX) - 1;;
         const cellY = Math.floor(nextY);
 
-        if (isOutOfBounds(cellX, cellY, MAP[0].length, MAP.length)) {
-            color = MAP_LEGEND[0]?.color;
-            sprite = MAP_LEGEND[0]?.sprite;
+        if (isOutOfBounds(cellX, cellY, WALLS[0].length, WALLS.length)) {
+            color = WALLS_LEGEND[0]?.color;
+            sprite = WALLS_LEGEND[0]?.sprite;
+
             break;
         }
 
-        wall = MAP[cellY][cellX];
+        wall = WALLS[cellY][cellX];
 
         if (wall) {
             // If cell is adjacent to wall, we render door opening
@@ -444,8 +535,8 @@ function getVerticalCollision(angle, player) {
                 color = DOOR_MAP_LEGEND[adjacentDoor]?.frameColor;
                 sprite = DOOR_MAP_LEGEND[adjacentDoor]?.frameSprite;
             } else {
-                color = MAP_LEGEND[wall]?.color;
-                sprite = MAP_LEGEND[wall]?.sprite;
+                color = WALLS_LEGEND[wall]?.color;
+                sprite = WALLS_LEGEND[wall]?.sprite;
             }
 
             break;
@@ -485,11 +576,11 @@ function getVerticalCollision(angle, player) {
 function getRays(player) {
 
     const start = player.angle - FOV / 2;
-    const length = SCREEN_WIDTH;
-    const step = FOV / length;
+    const step = FOV / SCREEN_WIDTH;
     const rays = [];
 
-    for (let i = 0; i < length; i++) {
+    for (let i = 0; i < SCREEN_WIDTH; i++) {
+
         const angle = start + step * i;
         const hCollision = getHorizontalCollision(angle, player);
         const vCollision = getVerticalCollision(angle, player);
@@ -551,7 +642,10 @@ function movePlayer(delta) {
         }
     }
 
+    // Action / Open Doors
+
     if (controls.action) {
+
         let doorX = Math.floor(player.x + Math.cos(player.angle));
         let doorY = Math.floor(player.y + Math.sin(player.angle));
 
@@ -578,6 +672,8 @@ function movePlayer(delta) {
 
         controls.action == false;
     }
+
+    // Move the Player
 
     if (player.speed !== 0) {
 
@@ -607,10 +703,11 @@ function movePlayer(delta) {
 }
 
 function isIntersectingWall(x, y) {
+
     const mapX = Math.floor(x);
     const mapY = Math.floor(y);
 
-    const wall = MAP[mapY][mapX];
+    const wall = WALLS[mapY][mapX];
 
     if (wall) {
         return true;
@@ -625,64 +722,66 @@ function isIntersectingWall(x, y) {
     return false;
 }
 
-function drawScene(rays) {
+function renderScene(rays) {
 
-    let i = INTERLACED_RENDERING && frameCounter % 2 === 0 ? 1 : 0;
-    let increment = INTERLACED_RENDERING ? 2 : 1;
+    let x = RENDER_INTERLACED && frameCounter % 2 === 0 ? 1 : 0;
+    let increment = RENDER_INTERLACED ? 2 : 1;
 
-    const length = rays.length;
+    for (; x < rays.length; x += increment) {
 
-    for (; i < length; i += increment) {
+        const ray = rays[x];
 
-        const ray = rays[i];
-
-        const distance = viewCorrection(ray.distance, ray.angle, player.angle);
+        const distance = getViewCorrectedDistance(ray.distance, ray.angle, player.angle);
         const height = WALL_HEIGHT / distance * 277;
         const y = SCREEN_HEIGHT / 2 - height / 2;
 
         // Ceiling
         ctx.fillStyle = CEILING_COLOR;
-        ctx.fillRect(i, 0, 1, y);
+        ctx.fillRect(x, 0, 1, y);
 
         // Floor
         ctx.fillStyle = FLOOR_COLOR;
-        ctx.fillRect(i, y + height, 1, SCREEN_HEIGHT / 2 + height / 2);
+        ctx.fillRect(x, y + height, 1, y);
 
         // Wall
         if (!RENDER_SPRITES || !ray.sprite) {
             ctx.fillStyle = ray.color;
-            ctx.fillRect(i, y, 1, height);
+            ctx.fillRect(x, y, 1, height);
         } else {
-            ctx.drawImage(spritesImage, ray.sprite.x + ray.spriteX, ray.sprite.y, 1, SPRITE_SIZE, i, y, 1, height);
+            ctx.drawImage(spritesheet, ray.sprite.x + ray.spriteX, ray.sprite.y, 1, SPRITE_SIZE, x, y, 1, height);
         }
     }
 }
 
-function drawObjects(rays, objects) {
+function renderObjects(rays, objects) {
 
-    objects.forEach(object => {
+    // TODO: Sort the objects by distance, furthest to nearest.
 
+    for (let i = 0; i < objects.length; i++) {
+
+        const object = objects[i];
         const distance = Vector.distance(player.x, player.y, object.x, object.y);
 
+        // Don't draw too close
         if (distance < .5) {
             return;
         }
 
         const angle = fixAngle(Math.atan2(object.y - player.y, object.x - player.x));
-        const height = WALL_HEIGHT / distance * 277;
-        const x = Math.floor(SCREEN_WIDTH / 2 - (player.angle - angle) * SCREEN_WIDTH / FOV - height / 2);
+        const size = WALL_HEIGHT / distance * 277;
+        const x = Math.floor(SCREEN_WIDTH / 2 - (player.angle - angle) * SCREEN_WIDTH / FOV - size / 2);
 
-        for (let i = 0; i < height; i++) {
-            if (x + i >= 0 && x + i < rays.length && rays[x + i].distance > distance) {
-                ctx.drawImage(spritesImage, object.sprite.x + Math.floor(SPRITE_SIZE / height * i), object.sprite.y, 1, SPRITE_SIZE, x + i, SCREEN_HEIGHT / 2 - height / 2, 1, height);
+        for (let j = 0; j < size; j++) {
+            if (x + j >= 0 && x + j < rays.length && rays[x + j].distance > distance) {
+                ctx.drawImage(spritesheet, object.sprite.x + Math.floor(SPRITE_SIZE / size * j), object.sprite.y, 1, SPRITE_SIZE, x + j, SCREEN_HEIGHT / 2 - size / 2, 1, size);
             }
         }
-    });
+    }
 }
 
-function drawMiniMap(map, rays, largeMap) {
+function renderMap(map, rays, largeMap) {
 
-    const scale = Math.floor(SCREEN_HEIGHT / MAP.length / 2);
+    const scale = Math.floor(SCREEN_HEIGHT / WALLS.length / 2);
     const width = map[0].length * scale;
     const height = map.length * scale;
     const left = Math.floor(SCREEN_WIDTH / 2 - width / 2);
@@ -691,8 +790,8 @@ function drawMiniMap(map, rays, largeMap) {
     const radius = scale * MINIMAP_CELLRADIUS;
     const translate = new Vector(0, 0).subtract(position).add(radius).add(scale, SCREEN_HEIGHT - radius * 2 - scale);
 
-
     if (!largeMap) {
+
         // Translate and clip to a circle
         ctx.save();
         ctx.translate(translate.x, translate.y);
@@ -704,7 +803,7 @@ function drawMiniMap(map, rays, largeMap) {
         ctx.clip();
     }
 
-    // Set alpha
+    // Set globalAlpha
     ctx.globalAlpha = MINIMAP_ALPHA;
 
     // Floors
@@ -721,10 +820,9 @@ function drawMiniMap(map, rays, largeMap) {
                 continue;
             }
 
-            ctx.fillStyle = MAP_LEGEND[colorIndex].color;
+            ctx.fillStyle = WALLS_LEGEND[colorIndex].color;
             ctx.fillRect(left + x * scale, top + y * scale, scale, scale);
         }
-
     }
 
     // Doors
@@ -732,22 +830,27 @@ function drawMiniMap(map, rays, largeMap) {
         for (let x = 0; x < DOOR_MAP[0].length; x++) {
 
             const colorIndex = DOOR_MAP[y][x];
+
             if (colorIndex === 0) {
                 continue;
             }
 
             const door = DOOR_MAP_LEGEND[colorIndex];
 
-            ctx.fillStyle = door.color;
 
             if (door.inset) {
+
+                ctx.fillStyle = door.color;
+
                 if (map[y - 1][x]) {
                     // Vertical door
                     ctx.fillRect(left + x * scale + scale / 3, top + y * scale, scale / 3, scale);
                 } else {
+                    // Horizontal door
                     ctx.fillRect(left + x * scale, top + y * scale + scale / 3, scale, scale / 3);
                 }
             } else {
+
                 ctx.fillRect(left + x * scale, top + y * scale, scale, scale);
             }
         }
@@ -756,16 +859,25 @@ function drawMiniMap(map, rays, largeMap) {
 
     // Rays
     if (MINIMAP_RAYS) {
-        ctx.globalAlpha = .025
+
+        ctx.globalAlpha = .025;
+
         ctx.strokeStyle = 'rgb(255, 255, 0)';
         ctx.lineWidth = 1;
+
         ctx.beginPath();
-        rays.forEach(ray => {
+
+        for (let i = 0; i < rays.length; i++) {
+
+            const ray = rays[i];
             const destination = new Vector(Math.cos(ray.angle), Math.sin(ray.angle)).multiply(ray.distance).multiply(scale).add(position);
+
             ctx.moveTo(position.x, position.y);
             ctx.lineTo(destination.x, destination.y);
-        });
+        }
+
         ctx.stroke();
+
         ctx.globalAlpha = MINIMAP_ALPHA;
     }
 
@@ -790,77 +902,50 @@ function drawMiniMap(map, rays, largeMap) {
     ctx.arc(position.x, position.y, scale / 4, 0, DOUBLE_PI);
     ctx.fill();
 
+    // Reset globalAlpha
     ctx.globalAlpha = 1;
 
+    // Restore the context
     if (!largeMap) {
         ctx.restore();
     }
 }
 
-function drawFps(fps) {
-    ctx.font = OSD_FONT;
-    ctx.fillStyle = OSD_COLOR;
-    ctx.textBaseline = 'top'
+function renderOsd() {
 
-    const display = `${fps} FPS`;
-    const size = ctx.measureText(display);
-    ctx.fillText(display, SCREEN_WIDTH - (size.width + 5), 5);
+    ctx.fillStyle = OSD_BACKGORUND;
+    ctx.fillRect(SCREEN_SAFEZONE, SCREEN_SAFEZONE, SCREEN_WIDTH - SCREEN_SAFEZONE * 2, OSD_HEIGHT);
 }
 
-function drawCoordinates() {
+function renderFps(fps) {
 
-    const positionText = `${player.x.toFixed(0)}, ${player.y.toFixed(0)}`;
-    const positionTextMeasurement = ctx.measureText(positionText);
+    ctx.font = OSD_FONT;
+    ctx.fillStyle = OSD_COLOR;
 
-    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = 'rgba(0,0,0,.75)'
-    ctx.fillRect(0, SCREEN_HEIGHT - 20, positionTextMeasurement.width + 10, 20);
-    ctx.fillStyle = 'white';
-    ctx.fillText(positionText, 5, SCREEN_HEIGHT - 10);
+
+    ctx.fillText(`${fps} FPS`, SCREEN_WIDTH - SCREEN_SAFEZONE * 2, SCREEN_SAFEZONE + OSD_MIDDLE);
 }
 
-function drawStatusText(text) {
+function renderCoordinates() {
+
     ctx.font = OSD_FONT;
     ctx.fillStyle = OSD_COLOR;
-    ctx.textBaseline = 'top'
 
-    ctx.fillText(text, 5, 5);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+
+    ctx.fillText(`${player.x.toFixed(0)},${player.y.toFixed(0)}`, SCREEN_SAFEZONE * 2, SCREEN_SAFEZONE + OSD_MIDDLE);
 }
 
-spritesImage.onload = () => {
-    // Remove the loader to prevent looping behaviour.
-    spritesImage.onload = null;
+function renderMessage(text) {
 
-    // The sprite image doesn't contain opacity data, 
-    // so we need to turn all pink colors to 0 alpha.
+    ctx.font = OSD_FONT;
+    ctx.fillStyle = OSD_COLOR;
 
-    // Create a temporary canvas.
-    const canvas = document.createElement('canvas');
-    canvas.width = spritesImage.width;
-    canvas.height = spritesImage.height;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
 
-    // Get the context and draw the sprite onto it.
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(spritesImage, 0, 0);
-
-    // Get the image data.
-    const imageData = ctx.getImageData(0, 0, spritesImage.width, spritesImage.height);
-    const data = imageData.data;
-
-    // Convert rgba(152, 0, 136, 255) to transparent.
-    for (let i = 0; i < data.length; i += 4) {
-        if (data[i] === 152 && data[i + 1] === 0 & data[i + 2] === 136) {
-            data[i + 3] = 0;
-        }
-    }
-
-    // Place the modifed image data onto the canvas.
-    ctx.putImageData(imageData, 0, 0);
-    spritesImage.src = canvas.toDataURL();
-
-    // Remove the temporary canvas
-    canvas.remove();
-
-    startGame();
-};
+    ctx.fillText(text, SCREEN_WIDTH / 2, SCREEN_SAFEZONE + OSD_MIDDLE);
+}
