@@ -7,11 +7,18 @@ import PerformanceCounter from './performance-counter';
 // Constants
 //
 
+const PI = Math.PI;
+const DOUBLE_PI = PI * 2;
+const HALF_PI = PI / 2;
+const DEG_TO_PI = PI / 180;
+
 const SCREEN_SCALE = 2.25;
 const SCREEN_WIDTH = 640 * SCREEN_SCALE;
 const SCREEN_HEIGHT = 480 * SCREEN_SCALE;
 
-const FOV = 70 * Math.PI / 180;
+const SCREEN_SAFEZONE = 10;
+
+const FOV = 70 * DEG_TO_PI;
 const WALL_HEIGHT = SCREEN_HEIGHT / 240;
 const SPRITE_SIZE = 64;
 
@@ -25,7 +32,7 @@ const MOVE_SLOW = .02;
 const MOVE_NORMAL = .04;
 const MOVE_FAST = .06;
 
-const TURN_RADIUS = Math.PI / 180 * 1.5;
+const TURN_RADIUS = DEG_TO_PI * 1.5;
 
 const MINIMAP_ALPHA = .9;
 const MINIMAP_CELLRADIUS = 12;
@@ -33,6 +40,11 @@ const MINIMAP_RAYS = false;
 const MINIMAP_NONE = 0;
 const MINIMAP_SMALL = 1;
 const MINIMAP_LARGE = 2;
+
+const PERFORMANCE_WIDTH = SCREEN_WIDTH / 3 * 2;
+const PERFORMANCE_HEIGHT = 75;
+const PERFORMANCE_X = SCREEN_WIDTH - PERFORMANCE_WIDTH - 10;
+const PERFORMANCE_Y = SCREEN_HEIGHT - (PERFORMANCE_HEIGHT + 5) * 2 - 10;
 
 const PLAYER_DEFAULT = {
     x: 30.5,
@@ -47,6 +59,7 @@ const PLAYER_DEFAULT = {
 
 let SHOW_FPS = JSON.parse(localStorage.getItem('SHOW_FPS')) ?? true;
 let SHOW_PERF = JSON.parse(localStorage.getItem('SHOW_PERF')) ?? true;
+let SHOW_COORDINATES = JSON.parse(localStorage.getItem('SHOW_COORDINATES')) ?? true;
 let RENDER_SPRITES = JSON.parse(localStorage.getItem('RENDER_SPRITES')) ?? true;
 let INTERLACED_RENDERING = JSON.parse(localStorage.getItem('INTERLACED_RENDERING')) ?? true;
 
@@ -224,53 +237,62 @@ function loop() {
     try {
         if (!controls.pause) {
 
+            let rays;
+
+            // Calculations
+            // ------------------------------
             calcPerf.start();
 
-            movePlayer(delta);
-            const rays = getRays(player);
+            update(delta);
+            rays = getRays(player);
 
             calcPerf.stop();
 
+            // Render
+            // ------------------------------
             drawPerf.start();
 
-            drawScene(rays);
-            drawObjects(rays, OBJECTS);
-
-            if (controls.map > 0) {
-                drawMiniMap(MAP, rays, controls.map === MINIMAP_LARGE);
-            }
-
-            if (SHOW_FPS) {
-                drawFps(fps.tick());
-            }
-
-            if (statusText) {
-                drawStatusText(statusText);
-            }
-
-            ctx.font = '10px sans-serif';
-            ctx.textBaseline = 'middle';
-
-            const positionText = `${player.x.toFixed(0)}, ${player.y.toFixed(0)}`;
-            const positionTextMeasurement = ctx.measureText(positionText);
-
-            ctx.fillStyle = 'rgba(0,0,0,.75)'
-            ctx.fillRect(0, SCREEN_HEIGHT - 20, positionTextMeasurement.width + 10, 20);
-            ctx.fillStyle = 'white';
-            ctx.fillText(positionText, 5, SCREEN_HEIGHT - 10);
+            render(rays);
 
             drawPerf.stop();
 
-            // Draw performance calculators
+            // Render Performance Chart
+            // ------------------------------
             if (SHOW_PERF) {
-                calcPerf.draw(ctx, 'blue', 'white', 5, 5, SCREEN_WIDTH / 2, 50);
-                drawPerf.draw(ctx, 'red', 'white', 5, 10 + 50, SCREEN_WIDTH / 2, 50);
+                calcPerf.draw(ctx, 'blue', 'white', PERFORMANCE_X, PERFORMANCE_Y, PERFORMANCE_WIDTH, PERFORMANCE_HEIGHT);
+                drawPerf.draw(ctx, 'red', 'white', PERFORMANCE_X, PERFORMANCE_Y + PERFORMANCE_HEIGHT + SCREEN_SAFEZONE, PERFORMANCE_WIDTH, PERFORMANCE_HEIGHT);
             }
         }
 
         requestAnimationFrame(loop);
     } catch (error) {
         throw error;
+    }
+}
+
+function update(delta) {
+    movePlayer(delta);
+}
+
+function render(rays) {
+
+    drawScene(rays);
+    drawObjects(rays, OBJECTS);
+
+    if (controls.map > MINIMAP_NONE) {
+        drawMiniMap(MAP, rays, controls.map === MINIMAP_LARGE);
+    }
+
+    if (SHOW_FPS) {
+        drawFps(fps.tick());
+    }
+
+    if (statusText) {
+        drawStatusText(statusText);
+    }
+
+    if (SHOW_COORDINATES) {
+        drawCoordinates();
     }
 }
 
@@ -284,11 +306,11 @@ function startGame() {
  */
 function fixAngle(angle) {
 
-    if (angle < -Math.PI) {
-        return angle + 2.0 * Math.PI;
+    if (angle < -PI) {
+        return angle + DOUBLE_PI;
     }
-    if (angle > Math.PI) {
-        return angle - 2.0 * Math.PI;
+    if (angle > PI) {
+        return angle - DOUBLE_PI;
     }
     return angle;
 }
@@ -304,7 +326,7 @@ function isOutOfBounds(sx, sy, dw, dh) {
 
 function getHorizontalCollision(angle, player) {
 
-    const up = Math.abs(Math.floor(angle / Math.PI) % 2) > 0;
+    const up = Math.abs(Math.floor(angle / PI) % 2) > 0;
 
     const mapY = up ? Math.floor(player.y) : Math.floor(player.y) + 1;
     const mapX = player.x + (mapY - player.y) / Math.tan(angle);
@@ -383,7 +405,7 @@ function getHorizontalCollision(angle, player) {
 
 function getVerticalCollision(angle, player) {
 
-    const right = Math.abs(Math.floor((angle - Math.PI / 2) / Math.PI) % 2) > 0;
+    const right = Math.abs(Math.floor((angle - HALF_PI) / PI) % 2) > 0;
 
     const mapX = right ? Math.floor(player.x) + 1 : Math.floor(player.x);
     const mapY = player.y + (mapX - player.x) * Math.tan(angle);
@@ -572,8 +594,8 @@ function movePlayer(delta) {
 
     if (player.side !== 0) {
 
-        let moveX = Math.cos(player.angle - Math.PI / 2) * player.side;
-        let moveY = Math.sin(player.angle - Math.PI / 2) * player.side;
+        let moveX = Math.cos(player.angle - HALF_PI) * player.side;
+        let moveY = Math.sin(player.angle - HALF_PI) * player.side;
 
         if (!isIntersectingWall(player.x + moveX, player.y)) {
             player.x += moveX;
@@ -677,7 +699,7 @@ function drawMiniMap(map, rays, largeMap) {
         ctx.lineWidth = 1;
         ctx.strokeStyle = 'white';
         ctx.beginPath();
-        ctx.arc(position.x, position.y, radius, 0, Math.PI * 2);
+        ctx.arc(position.x, position.y, radius, 0, DOUBLE_PI);
         ctx.stroke();
         ctx.clip();
     }
@@ -750,7 +772,7 @@ function drawMiniMap(map, rays, largeMap) {
     // Torso
     ctx.fillStyle = 'black';
     ctx.beginPath();
-    ctx.ellipse(position.x, position.y, scale / 2, scale / 3, player.angle + Math.PI / 2, 0, Math.PI * 2)
+    ctx.ellipse(position.x, position.y, scale / 2, scale / 3, player.angle + HALF_PI, 0, DOUBLE_PI)
     ctx.fill();
 
     // Direction
@@ -765,7 +787,7 @@ function drawMiniMap(map, rays, largeMap) {
     // Head
     ctx.fillStyle = 'orange';
     ctx.beginPath();
-    ctx.arc(position.x, position.y, scale / 4, 0, Math.PI * 2);
+    ctx.arc(position.x, position.y, scale / 4, 0, DOUBLE_PI);
     ctx.fill();
 
     ctx.globalAlpha = 1;
@@ -783,6 +805,19 @@ function drawFps(fps) {
     const display = `${fps} FPS`;
     const size = ctx.measureText(display);
     ctx.fillText(display, SCREEN_WIDTH - (size.width + 5), 5);
+}
+
+function drawCoordinates() {
+
+    const positionText = `${player.x.toFixed(0)}, ${player.y.toFixed(0)}`;
+    const positionTextMeasurement = ctx.measureText(positionText);
+
+    ctx.font = '10px sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(0,0,0,.75)'
+    ctx.fillRect(0, SCREEN_HEIGHT - 20, positionTextMeasurement.width + 10, 20);
+    ctx.fillStyle = 'white';
+    ctx.fillText(positionText, 5, SCREEN_HEIGHT - 10);
 }
 
 function drawStatusText(text) {
