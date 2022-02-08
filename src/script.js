@@ -37,6 +37,13 @@ const MOVE_FAST = .06;
 
 const TURN_RADIUS = DEG_TO_PI * 1.5;
 
+const DOOR_OPEN = 1;
+const DOOR_CLOSED = 2;
+const DOOR_OPENING = 3;
+const DOOR_CLOSING = 4;
+
+const DOOR_OPEN_TICKS = 2000;
+
 const MINIMAP_ALPHA = .9;
 const MINIMAP_CELLRADIUS = 12;
 const MINIMAP_RAYS = false;
@@ -323,6 +330,7 @@ function loop() {
 function update(delta) {
 
     movePlayer(delta);
+    moveDoors(delta);
 }
 
 function render(rays) {
@@ -408,6 +416,7 @@ function getHorizontalCollision(angle, player) {
 
     let color;
     let sprite;
+    let spriteOffsetX = 0;
 
     while (true) {
 
@@ -437,19 +446,21 @@ function getHorizontalCollision(angle, player) {
 
         door = DOORS[cellY][cellX];
 
-        // Special logic for the doors, they are inset by half step
-        if (door && door.open === false) { // If door is even, it is open
-            color = door.darkColor;
-            sprite = door.darkSprite;
+        // Special logic for the doors, they are inset by half step and can be opening/closing.
+        if (door && door.action !== DOOR_OPEN) {
 
-            if (door.inset) {
+            // If door is opening or closing, we check if we hit it.
+            if (door.action === DOOR_CLOSED || nextX + halfStepX - Math.floor(nextX + halfStepX) > door.position) {
+
+                color = door.darkColor;
+                sprite = door.darkSprite;
+                spriteOffsetX = -door.position;
+
                 nextX += halfStepX;
                 nextY += halfStepY;
-            }
 
-            break;
-        } else {
-            door = undefined;
+                break;
+            }
         }
 
         nextX += stepX;
@@ -461,7 +472,7 @@ function getHorizontalCollision(angle, player) {
         distance: Vector.distance(player.x, player.y, nextX, nextY),
         color: color,
         sprite: sprite,
-        spriteX: (nextX - Math.floor(nextX)) * SPRITE_SIZE,
+        spriteX: (spriteOffsetX + nextX - Math.floor(nextX)) * SPRITE_SIZE,
         vertical: false
     };
 }
@@ -487,6 +498,7 @@ function getVerticalCollision(angle, player) {
 
     let color;
     let sprite;
+    let spriteOffsetX = 0;
 
     while (true) {
 
@@ -516,19 +528,21 @@ function getVerticalCollision(angle, player) {
 
         door = DOORS[cellY][cellX];
 
-        // Special logic for the doors, they are inset by half step
-        if (door && door.open === false) { // If door is even, it is open
-            color = door.color;
-            sprite = door.sprite;
+        // Special logic for the doors, they are inset by half step and can be opening/closing.
+        if (door && door.action !== DOOR_OPEN) {
 
-            if (door.inset) {
+            // If door is opening or closing, we check if we hit it.
+            if (door.action === DOOR_CLOSED || nextY + halfStepY - Math.floor(nextY + halfStepY) > door.position) {
+
+                color = door.darkColor;
+                sprite = door.darkSprite;
+                spriteOffsetX = -door.position;
+
                 nextX += halfStepX;
                 nextY += halfStepY;
-            }
 
-            break;
-        } else {
-            door = undefined;
+                break;
+            }
         }
 
         nextX += stepX;
@@ -540,7 +554,7 @@ function getVerticalCollision(angle, player) {
         distance: Vector.distance(player.x, player.y, nextX, nextY),
         color: color,
         sprite: sprite,
-        spriteX: (nextY - Math.floor(nextY)) * SPRITE_SIZE,
+        spriteX: (spriteOffsetX + nextY - Math.floor(nextY)) * SPRITE_SIZE,
         vertical: true
     };
 }
@@ -623,28 +637,20 @@ function movePlayer(delta) {
 
         let door = DOORS[doorY][doorX];
 
-        if (door && door.open === false) {
-            door.open = true;
-
-            const autoClose = () => {
-                setTimeout(() => {
-                    // Make sure player isn't standing in door way.
-                    const x = Math.floor(player.x);
-                    const y = Math.floor(player.y);
-
-                    if (y === doorY && x === doorX) {
-                        autoClose();
-                        return;
-                    }
-                    door.open = false;
-                }, 3000);
-            };
-
-            autoClose();
-
+        if (door) {
+            switch (door.action) {
+                case DOOR_CLOSED:
+                case DOOR_CLOSING:
+                    door.action = DOOR_OPENING;
+                    break;
+                case DOOR_OPEN:
+                case DOOR_OPENING:
+                    door.action = DOOR_CLOSING;
+                    break;
+            }
         }
 
-        controls.action == false;
+        controls.action = false;
     }
 
     // Move the Player
@@ -676,6 +682,51 @@ function movePlayer(delta) {
     }
 }
 
+function moveDoors(delta) {
+
+    for (let y = 0; y < DOORS.length; y++) {
+        for (let x = 0; x < DOORS[y].length; x++) {
+
+            const door = DOORS[y][x];
+
+            if (!door) {
+                continue;
+            }
+
+            switch (door.action) {
+                case DOOR_OPEN:
+                    door.ticks += delta;
+
+                    if (door.ticks >= DOOR_OPEN_TICKS && (Math.floor(player.x) != x || Math.floor(player.y) != y)) {
+                        door.action = DOOR_CLOSING;
+                    }
+
+                    break;
+                case DOOR_OPENING:
+                    door.position += delta / 1000;
+
+                    if (door.position >= 1) {
+                        door.position = 1;
+                        door.ticks = 0;
+                        door.action = DOOR_OPEN;
+                    }
+
+                    break;
+                case DOOR_CLOSING:
+                    door.position -= delta / 1000;
+
+                    if (door.position <= 0) {
+                        door.position = 0;
+                        door.action = DOOR_CLOSED;
+                    }
+
+                    break;
+            }
+
+        }
+    }
+}
+
 function isIntersectingWall(x, y) {
 
     const mapX = Math.floor(x);
@@ -689,7 +740,7 @@ function isIntersectingWall(x, y) {
 
     const door = DOORS[mapY][mapX];
 
-    if (door && door.open === false) {
+    if (door && door.action !== DOOR_OPEN) {
         return true;
     }
 
@@ -705,7 +756,7 @@ function renderScene(ctx, rays) {
 
         const ray = rays[x];
 
-        const distance = getViewCorrectedDistance(ray.distance, ray.angle, player.angle);
+        const distance =  getViewCorrectedDistance(ray.distance, ray.angle, player.angle);
         const height = WALL_HEIGHT / distance * 277;
         const y = SCREEN_HEIGHT / 2 - height / 2;
 
@@ -740,16 +791,16 @@ function renderObjects(ctx, rays, objects) {
             }
 
             const distance = Vector.distance(player.x, player.y, object.x, object.y);
-    
+
             // Don't draw too close
             if (distance < .5) {
                 return;
             }
-    
+
             const angle = fixAngle(Math.atan2(object.y - player.y, object.x - player.x));
             const size = WALL_HEIGHT / distance * 277;
             const x = Math.floor(SCREEN_WIDTH / 2 - (player.angle - angle) * SCREEN_WIDTH / FOV - size / 2);
-    
+
             for (let j = 0; j < size; j++) {
                 if (x + j >= 0 && x + j < rays.length && rays[x + j].distance > distance) {
                     ctx.drawImage(spritesheet, object.sprite.x + Math.floor(SPRITE_SIZE / size * j), object.sprite.y, 1, SPRITE_SIZE, x + j, SCREEN_HEIGHT / 2 - size / 2, 1, size);
@@ -757,7 +808,7 @@ function renderObjects(ctx, rays, objects) {
             }
         }
 
-        
+
     }
 }
 
@@ -813,24 +864,18 @@ function renderMap(ctx, map, rays, largeMap) {
 
             const door = DOORS[y][x];
 
-            if (!door || door.open) {
+            if (!door || door.action === DOOR_OPEN) {
                 continue;
             }
 
-            if (door.inset) {
+            ctx.fillStyle = door.color;
 
-                ctx.fillStyle = door.color;
-
-                if (map[y - 1][x]) {
-                    // Vertical door
-                    ctx.fillRect(left + x * scale + scale / 3, top + y * scale, scale / 3, scale);
-                } else {
-                    // Horizontal door
-                    ctx.fillRect(left + x * scale, top + y * scale + scale / 3, scale, scale / 3);
-                }
+            if (map[y - 1][x]) {
+                // Vertical door
+                ctx.fillRect(left + x * scale + scale / 3, top + y * scale, scale / 3, scale);
             } else {
-
-                ctx.fillRect(left + x * scale, top + y * scale, scale, scale);
+                // Horizontal door
+                ctx.fillRect(left + x * scale, top + y * scale + scale / 3, scale, scale / 3);
             }
         }
 

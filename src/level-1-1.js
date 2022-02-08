@@ -129,8 +129,8 @@ function createLevel() {
     ];
 
     const doorSprites = {
-        '1': { color: '#00a4a4', darkColor: '#297979', sprite: 98, darkSprite: 99, frameColor: '#00a4a4', frameDarkColor: '#297979', frameSprite: 100, frameDarkSprite: 101, inset: true, open: false }, // Normal Door
-        '2': { color: '#cccccc', darkColor: '#dddddd', sprite: 24, darkSprite: 25, frameColor: '#cccccc', frameDarkColor: '#dddddd', frameSprite: 100, frameDarkSprite: 101, inset: true, open: false }, // Elevator Door
+        '1': { color: '#00a4a4', darkColor: '#297979', sprite: 98, darkSprite: 99, frameColor: '#00a4a4', frameDarkColor: '#297979', frameSprite: 100, frameDarkSprite: 101, action: 2, position: 0, ticks: 0 }, // Normal Door
+        '2': { color: '#cccccc', darkColor: '#dddddd', sprite: 24, darkSprite: 25, frameColor: '#cccccc', frameDarkColor: '#dddddd', frameSprite: 100, frameDarkSprite: 101, action: 2, position: 0, ticks: 0 }, // Elevator Door
     };
 
     const objects = [
