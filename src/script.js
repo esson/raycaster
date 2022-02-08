@@ -58,9 +58,8 @@ const PLAYER_DEFAULT = {
 // Settings
 //
 
-let SHOW_FPS = JSON.parse(localStorage.getItem('SHOW_FPS')) ?? true;
-let SHOW_PERF = JSON.parse(localStorage.getItem('SHOW_PERF')) ?? true;
-let SHOW_COORDS = JSON.parse(localStorage.getItem('SHOW_COORDS')) ?? true;
+let SHOW_DEBUG = JSON.parse(localStorage.getItem('SHOW_FPS')) ?? true;
+let SHOW_GRAPHS = JSON.parse(localStorage.getItem('SHOW_GRAPHS')) ?? true;
 let RENDER_SPRITES = JSON.parse(localStorage.getItem('RENDER_SPRITES')) ?? true;
 let RENDER_INTERLACED = JSON.parse(localStorage.getItem('RENDER_INTERLACED')) ?? true;
 
@@ -211,18 +210,18 @@ const keyboardToFunctionMap = {
                 break;
         }
     },
-    // Toggle FPS
-    KeyU: () => SHOW_FPS = !SHOW_FPS,
-    // Toggle Performance
-    KeyC: () => setMessageText('PERFORMANCE GRAPH', SHOW_PERF = !SHOW_PERF),
+    // Toggle Debug
+    KeyU: () => SHOW_DEBUG = !SHOW_DEBUG,
+    // Toggle Performance Graphs
+    KeyG: () => SHOW_GRAPHS = !SHOW_GRAPHS,
     // Toggle Interlacing
     KeyI: () => setMessageText('INTERLACING', RENDER_INTERLACED = !RENDER_INTERLACED),
     // Toggle Sprites
     KeyO: () => setMessageText('SPRITES', RENDER_SPRITES = !RENDER_SPRITES),
-    // Reset
-    KeyR: () => (setMessageText('PLAYER RESET'), player = { ...PLAYER_DEFAULT, x: LEVEL.spawn.x, y: LEVEL.spawn.y }),
     // Toggle Smoothing
-    KeyL: () => setMessageText('SMOOTHING', ctx.imageSmoothingEnabled = !ctx.imageSmoothingEnabled)
+    KeyP: () => setMessageText('SMOOTHING', ctx.imageSmoothingEnabled = !ctx.imageSmoothingEnabled),
+    // Reset
+    KeyR: () => (setMessageText('PLAYER RESET'), player = { ...PLAYER_DEFAULT, x: LEVEL.spawn.x, y: LEVEL.spawn.y })
 }
 
 document.addEventListener('keydown', (e) => {
@@ -234,7 +233,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 document.addEventListener('keyup', (e) => {
-
+    console.log(e.code);
     // Set false on controls
     if (e.code in keyboardToControlMap) {
         controls[keyboardToControlMap[e.code]] = false;
@@ -258,9 +257,8 @@ window.addEventListener('unload', (e) => {
 
     localStorage.setItem('player', JSON.stringify(player));
 
-    localStorage.setItem('SHOW_FPS', JSON.stringify(SHOW_FPS));
-    localStorage.setItem('SHOW_COORDS', JSON.stringify(SHOW_COORDS));
-    localStorage.setItem('SHOW_PERF', JSON.stringify(SHOW_PERF));
+    localStorage.setItem('SHOW_DEBUG', JSON.stringify(SHOW_DEBUG));
+    localStorage.setItem('SHOW_GRAPHS', JSON.stringify(SHOW_GRAPHS));
 
     localStorage.setItem('RENDER_INTERLACED', JSON.stringify(RENDER_INTERLACED));
     localStorage.setItem('RENDER_SPRITES', JSON.stringify(RENDER_SPRITES));
@@ -319,7 +317,7 @@ function loop() {
 
             // Render Performance Chart
             // ------------------------------
-            if (SHOW_PERF) {
+            if (SHOW_GRAPHS) {
                 calcPerf.draw(ctx, 'blue', 'white', PERFORMANCE_X, PERFORMANCE_Y, PERFORMANCE_WIDTH, PERFORMANCE_HEIGHT);
                 drawPerf.draw(ctx, 'red', 'white', PERFORMANCE_X, PERFORMANCE_Y + PERFORMANCE_HEIGHT + SCREEN_SAFEZONE, PERFORMANCE_WIDTH, PERFORMANCE_HEIGHT);
             }
@@ -346,20 +344,17 @@ function render(rays) {
         renderMap(ctx, WALLS, rays, controls.map === MINIMAP_LARGE);
     }
 
-    if (SHOW_FPS || messageText || SHOW_COORDS) {
+    if (SHOW_DEBUG || messageText) {
      
         renderOsd(ctx);
      
-        if (SHOW_FPS) {
+        if (SHOW_DEBUG) {
+            renderCoordinates(ctx);
             renderFps(ctx, fps.tick());
         }
 
         if (messageText) {
             renderMessage(ctx, messageText);
-        }
-
-        if (SHOW_COORDS) {
-            renderCoordinates(ctx);
         }
     }
 }
