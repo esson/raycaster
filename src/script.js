@@ -31,9 +31,9 @@ const OSD_FONT = '12px monospace';
 const OSD_HEIGHT = 20;
 const OSD_MIDDLE = OSD_HEIGHT / 2;
 
-const MOVE_SLOW = .02;
-const MOVE_NORMAL = .04;
-const MOVE_FAST = .06;
+const MOVE_SLOW = .04;
+const MOVE_NORMAL = .06;
+const MOVE_FAST = .10;
 
 const TURN_RADIUS = DEG_TO_PI * 1.5;
 
