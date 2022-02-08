@@ -69,6 +69,7 @@ let SHOW_DEBUG = JSON.parse(localStorage.getItem('SHOW_FPS')) ?? true;
 let SHOW_GRAPHS = JSON.parse(localStorage.getItem('SHOW_GRAPHS')) ?? true;
 let RENDER_SPRITES = JSON.parse(localStorage.getItem('RENDER_SPRITES')) ?? true;
 let RENDER_INTERLACED = JSON.parse(localStorage.getItem('RENDER_INTERLACED')) ?? true;
+let WALL_COLLISION = JSON.parse(localStorage.getItem('WALL_COLLISION')) ?? true;
 
 // Level / Map / Doors / Objects
 //
@@ -215,6 +216,8 @@ const keyboardToFunctionMap = {
     KeyI: () => setMessageText('INTERLACING', RENDER_INTERLACED = !RENDER_INTERLACED),
     // Toggle Sprites
     KeyO: () => setMessageText('SPRITES', RENDER_SPRITES = !RENDER_SPRITES),
+    // Toggle Wall Collision
+    BracketLeft: () => setMessageText('WALL COLLISION', WALL_COLLISION = !WALL_COLLISION),
     // Toggle Smoothing
     KeyP: () => setMessageText('SMOOTHING', ctx.imageSmoothingEnabled = !ctx.imageSmoothingEnabled),
     // Reset
@@ -230,6 +233,8 @@ document.addEventListener('keydown', (e) => {
 });
 
 document.addEventListener('keyup', (e) => {
+
+    console.log(e.code);
 
     // Set false on controls
     if (e.code in keyboardToControlMap) {
@@ -729,6 +734,10 @@ function moveDoors(delta) {
 
 function isIntersectingWall(x, y) {
 
+    if (!WALL_COLLISION) {
+        return false;
+    }
+
     const mapX = Math.floor(x);
     const mapY = Math.floor(y);
 
@@ -756,7 +765,7 @@ function renderScene(ctx, rays) {
 
         const ray = rays[x];
 
-        const distance =  getViewCorrectedDistance(ray.distance, ray.angle, player.angle);
+        const distance = getViewCorrectedDistance(ray.distance, ray.angle, player.angle);
         const height = WALL_HEIGHT / distance * 277;
         const y = SCREEN_HEIGHT / 2 - height / 2;
 
