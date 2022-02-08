@@ -339,27 +339,27 @@ function update(delta) {
 
 function render(rays) {
 
-    renderScene(rays);
-    renderObjects(rays, OBJECTS);
+    renderScene(ctx, rays);
+    renderObjects(ctx, rays, OBJECTS);
 
     if (controls.map > MINIMAP_NONE) {
-        renderMap(WALLS, rays, controls.map === MINIMAP_LARGE);
+        renderMap(ctx, WALLS, rays, controls.map === MINIMAP_LARGE);
     }
 
     if (SHOW_FPS || messageText || SHOW_COORDS) {
      
-        renderOsd();
+        renderOsd(ctx);
      
         if (SHOW_FPS) {
-            renderFps(fps.tick());
+            renderFps(ctx, fps.tick());
         }
 
         if (messageText) {
-            renderMessage(messageText);
+            renderMessage(ctx, messageText);
         }
 
         if (SHOW_COORDS) {
-            renderCoordinates();
+            renderCoordinates(ctx);
         }
     }
 }
@@ -711,7 +711,7 @@ function isIntersectingWall(x, y) {
     return false;
 }
 
-function renderScene(rays) {
+function renderScene(ctx, rays) {
 
     let x = RENDER_INTERLACED && frameCounter % 2 === 0 ? 1 : 0;
     let increment = RENDER_INTERLACED ? 2 : 1;
@@ -742,7 +742,7 @@ function renderScene(rays) {
     }
 }
 
-function renderObjects(rays, objects) {
+function renderObjects(ctx, rays, objects) {
 
     // TODO: Sort the objects by distance, furthest to nearest.
 
@@ -768,7 +768,7 @@ function renderObjects(rays, objects) {
     }
 }
 
-function renderMap(map, rays, largeMap) {
+function renderMap(ctx, map, rays, largeMap) {
 
     const scale = Math.floor(SCREEN_HEIGHT / WALLS.length / 2);
     const width = map[0].length * scale;
@@ -900,13 +900,13 @@ function renderMap(map, rays, largeMap) {
     }
 }
 
-function renderOsd() {
+function renderOsd(ctx) {
 
     ctx.fillStyle = OSD_BACKGORUND;
     ctx.fillRect(SCREEN_SAFEZONE, SCREEN_SAFEZONE, SCREEN_WIDTH - SCREEN_SAFEZONE * 2, OSD_HEIGHT);
 }
 
-function renderFps(fps) {
+function renderFps(ctx, fps) {
 
     ctx.font = OSD_FONT;
     ctx.fillStyle = OSD_COLOR;
@@ -917,7 +917,7 @@ function renderFps(fps) {
     ctx.fillText(`${fps} FPS`, SCREEN_WIDTH - SCREEN_SAFEZONE * 2, SCREEN_SAFEZONE + OSD_MIDDLE);
 }
 
-function renderCoordinates() {
+function renderCoordinates(ctx) {
 
     ctx.font = OSD_FONT;
     ctx.fillStyle = OSD_COLOR;
@@ -928,7 +928,7 @@ function renderCoordinates() {
     ctx.fillText(`${player.x.toFixed(0)},${player.y.toFixed(0)}`, SCREEN_SAFEZONE * 2, SCREEN_SAFEZONE + OSD_MIDDLE);
 }
 
-function renderMessage(text) {
+function renderMessage(ctx, text) {
 
     ctx.font = OSD_FONT;
     ctx.fillStyle = OSD_COLOR;
