@@ -59,13 +59,15 @@ function createLevel() {
         '                           2             2                     ',
         '                           2             2                     ',
         '                           2             2                     ',
-        '                           222222222222222                     '
+        '                           242242252242242                     '
     ];
 
     const wallSprites = {
-        '1': { color: '#797979', darkColor: '#616161', sprite:  0, darkSprite:  1 }, // Stone Wall
+        '1': { color: '#797979', darkColor: '#616161', sprite: 0, darkSprite: 1 }, // Stone Wall
         '2': { color: '#09096f', darkColor: '#070759', sprite: 14, darkSprite: 15 }, // Blue Stone Wall
         '3': { color: '#604220', darkColor: '#4d351a', sprite: 22, darkSprite: 23 }, // Wood Panel Wall
+        '4': { color: '#09096f', darkColor: '#070759', sprite:  8, darkSprite:  9 }, // Blue Stone Wall - Cell
+        '5': { color: '#09096f', darkColor: '#070759', sprite: 12, darkSprite: 13 }, // Blue Stone Wall - Cell Skeleton
         '8': { color: '#797979', darkColor: '#616161', sprite: 40, darkSprite: 40 }, // Elevator Side Wall
         'a': { color: '#797979', darkColor: '#616161', sprite: 43, darkSprite: 43, next: 'b' }, // Elevator Controls Off Wall
         'b': { color: '#797979', darkColor: '#616161', sprite: 41, darkSprite: 41, next: 'a' }, // Elevator Controls On Wall
@@ -192,22 +194,24 @@ function createLevel() {
         '------------------ ------       -   -                          ',
         '          --  -     -      ------- -------                     ',
         '         -    -  - -       -    -   -    -                     ',
-        '          --     --        -             -                     ',
+        '          --     --        -      2      -                     ',
         '            - ----         -    -   -    -                     ',
         '            -  -           -    -   -    -                     ',
         '            -  -           ------   ------                     ',
         '            ----           -    -   -    -                     ',
-        '                           -             -                     ',
+        '                           -   3  2      -                     ',
         '                           -    -   -    -                     ',
         '                           ------   ------                     ',
         '                           -             -                     ',
-        '                           - 1         1 -                     ',
+        '                           -  2       2  -                     ',
         '                           -             -                     ',
         '                           ---------------                     '
     ];
 
     const objectSprites = {
         '1': { sprite: 116 }, // Tree
+        '2': { sprite: 122 }, // Ceiling Light
+        '3': { sprite: 201 }, // Corpse
     };
 
     Object.keys(wallSprites).map(key => wallSprites[key]).forEach(x => x.sprite = getSpritesheetCoordinates(x.sprite));
