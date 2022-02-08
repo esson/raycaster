@@ -439,11 +439,11 @@ function getHorizontalCollision(angle, player) {
             let adjacentDoor = up ? DOORS[cellY + 1][cellX] : DOORS[cellY - 1][cellX];
 
             if (adjacentDoor) {
-                color = adjacentDoor.frameDarkColor;
-                sprite = adjacentDoor.frameDarkSprite;
+                color = adjacentDoor.frameColor;
+                sprite = adjacentDoor.frameSprite;
             } else {
-                color = wall.darkColor;
-                sprite = wall.darkSprite;
+                color = wall.color;
+                sprite = wall.sprite;
             }
 
             break;
@@ -457,8 +457,8 @@ function getHorizontalCollision(angle, player) {
             // If door is opening or closing, we check if we hit it.
             if (door.action === DOOR_CLOSED || nextX + halfStepX - Math.floor(nextX + halfStepX) > door.position) {
 
-                color = door.darkColor;
-                sprite = door.darkSprite;
+                color = door.color;
+                sprite = door.sprite;
                 spriteOffsetX = -door.position;
 
                 nextX += halfStepX;
@@ -521,11 +521,11 @@ function getVerticalCollision(angle, player) {
             let adjacentDoor = right ? DOORS[cellY][cellX - 1] : DOORS[cellY][cellX + 1];
 
             if (adjacentDoor) {
-                color = adjacentDoor.frameColor;
-                sprite = adjacentDoor.frameSprite;
+                color = adjacentDoor.frameDarkColor;
+                sprite = adjacentDoor.frameDarkSprite;
             } else {
-                color = wall.color;
-                sprite = wall.sprite;
+                color = wall.darkColor;
+                sprite = wall.darkSprite;
             }
 
             break;
@@ -539,8 +539,8 @@ function getVerticalCollision(angle, player) {
             // If door is opening or closing, we check if we hit it.
             if (door.action === DOOR_CLOSED || nextY + halfStepY - Math.floor(nextY + halfStepY) > door.position) {
 
-                color = door.color;
-                sprite = door.sprite;
+                color = door.darkColor;
+                sprite = door.darkSprite;
                 spriteOffsetX = -door.position;
 
                 nextX += halfStepX;
