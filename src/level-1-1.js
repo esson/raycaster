@@ -62,11 +62,11 @@ function createLevel() {
         '                           222222222222222                     '
     ];
 
-    const wallSprites = [
-        { color: '#797979', darkColor: '#616161', sprite: 0,  darkSprite: 1  }, // Stone Wall
-        { color: '#09096f', darkColor: '#070759', sprite: 14, darkSprite: 15 }, // Blue Stone Wall
-        { color: '#604220', darkColor: '#4d351a', sprite: 22, darkSprite: 23 }, // Wood Panel Wall
-    ];
+    const wallSprites = {
+        '1': { color: '#797979', darkColor: '#616161', sprite: 0, darkSprite: 1 }, // Stone Wall
+        '2': { color: '#09096f', darkColor: '#070759', sprite: 14, darkSprite: 15 }, // Blue Stone Wall
+        '3': { color: '#604220', darkColor: '#4d351a', sprite: 22, darkSprite: 23 }, // Wood Panel Wall
+    };
 
     const doors = [
         '                            -------------                      ',
@@ -109,7 +109,7 @@ function createLevel() {
         '-   -----   -                   -   -         -   1         -  ',
         '-   -----   -------------       -   -         -   -         -  ',
         '-                -      ---     -   -         ------ - - - --  ',
-        '-                       3 -     -   -               - - - -    ',
+        '-                       2 -     -   -               - - - -    ',
         '-                -      ---     -   -                          ',
         '------------------1------       -   -                          ',
         '          --  -  1  -      -------1-------                     ',
@@ -128,11 +128,10 @@ function createLevel() {
         '                           ---------------                     '
     ];
 
-    const doorSprites = [
-        { color: '#00a4a4', darkColor: '#297979', sprite: 98, darkSprite: 99, frameColor: '#00a4a4', frameDarkColor: '#297979', frameSprite: 100, frameDarkSprite: 101, inset: true  }, // Normal Door
-        { color: '#000000', darkColor: '#000000', sprite: -1, darkSprite: -1, frameColor: '#00a4a4', frameDarkColor: '#297979', frameSprite: 100, frameDarkSprite: 101, inset: true  }, // Open Normal Door
-        { color: '#cccccc', darkColor: '#dddddd', sprite: 24, darkSprite: 25, frameColor: '#cccccc', frameDarkColor: '#dddddd', frameSprite: 100, frameDarkSprite: 101, inset: true }, // Elevator Door
-    ];
+    const doorSprites = {
+        '1': { color: '#00a4a4', darkColor: '#297979', sprite: 98, darkSprite: 99, frameColor: '#00a4a4', frameDarkColor: '#297979', frameSprite: 100, frameDarkSprite: 101, inset: true, open: false }, // Normal Door
+        '2': { color: '#cccccc', darkColor: '#dddddd', sprite: 24, darkSprite: 25, frameColor: '#cccccc', frameDarkColor: '#dddddd', frameSprite: 100, frameDarkSprite: 101, inset: true, open: false }, // Elevator Door
+    };
 
     const objects = [
         '                            -------------                      ',
@@ -194,46 +193,52 @@ function createLevel() {
         '                           ---------------                     '
     ];
 
-    const objectSprites = [
-        { sprite: 116 }, // Tree
-    ];
+    const objectSprites = {
+        '1': { sprite: 116 }, // Tree
+    };
 
-    wallSprites.forEach(x => x.sprite = getSpriteVector(x.sprite));
-    wallSprites.forEach(x => x.darkSprite = getSpriteVector(x.darkSprite));
-    wallSprites.unshift(undefined);
-
-    doorSprites.forEach(x => x.sprite = getSpriteVector(x.sprite));
-    doorSprites.forEach(x => x.darkSprite = getSpriteVector(x.darkSprite));
-    doorSprites.forEach(x => x.frameSprite = getSpriteVector(x.frameSprite));
-    doorSprites.forEach(x => x.frameDarkSprite = getSpriteVector(x.frameDarkSprite));
-    doorSprites.unshift(undefined);
-
-    objectSprites.forEach(x => x.sprite = getSpriteVector(x.sprite));
-    objectSprites.forEach(x => x.darkSprite = getSpriteVector(x.darkSprite));
-    objectSprites.unshift(undefined);
+    Object.keys(wallSprites).map(key => wallSprites[key]).forEach(x => x.sprite = getSpritesheetCoordinates(x.sprite));
+    Object.keys(wallSprites).map(key => wallSprites[key]).forEach(x => x.darkSprite = getSpritesheetCoordinates(x.darkSprite));
+    Object.keys(doorSprites).map(key => doorSprites[key]).forEach(x => x.sprite = getSpritesheetCoordinates(x.sprite));
+    Object.keys(doorSprites).map(key => doorSprites[key]).forEach(x => x.darkSprite = getSpritesheetCoordinates(x.darkSprite));
+    Object.keys(doorSprites).map(key => doorSprites[key]).forEach(x => x.frameSprite = getSpritesheetCoordinates(x.frameSprite));
+    Object.keys(doorSprites).map(key => doorSprites[key]).forEach(x => x.frameDarkSprite = getSpritesheetCoordinates(x.frameDarkSprite));
+    Object.keys(objectSprites).map(key => objectSprites[key]).forEach(x => x.sprite = getSpritesheetCoordinates(x.sprite));
+    Object.keys(objectSprites).map(key => objectSprites[key]).forEach(x => x.darkSprite = getSpritesheetCoordinates(x.darkSprite));
 
     return {
         spawn: new Vector(29, 50).add(.5),
 
-        walls: walls.map(mapLiteralToMapIndex),
-        wallsLegend: wallSprites,
-        
-        doors: doors.map(mapLiteralToMapIndex),
-        doorsLegend: doorSprites,
-        
-        objects: objects.map(mapLiteralToMapIndex),
-        objectsLegend: objectSprites,
+        walls: walls.map(mapLiteralToSpriteObject(wallSprites, true)),
+        doors: doors.map(mapLiteralToSpriteObject(doorSprites, false)),
+        objects: objects.map(mapLiteralToSpriteObject(objectSprites, false, true)),
 
         spriteUrl: 'sprites.png'
     };
 }
 
-function mapLiteralToMapIndex(y) {
-    return y.split('').map(x => parseInt(x === ' ' || x === '-' ? '0' : x));
+function mapLiteralToSpriteObject(spriteObjects, shared = false, coordinates = false) {
+    
+    if (coordinates) {
+        return (row, y) => row.split('').map((col, x) => col === ' ' || col === '-' ? undefined : { ...spriteObjects[col], x: parseInt(x) + .5, y: y + .5 });
+    }
+    
+    if (shared) {
+        return (y) => y.split('').map(x => x === ' ' || x === '-' ? undefined : spriteObjects[x]);
+    }
+
+    return (y) => y.split('').map(x => x === ' ' || x === '-' ? undefined : { ...spriteObjects[x] });
 }
 
-function getSpriteVector(index, w = 16) {
-    return new Vector(index % w, Math.floor(index / w)).multiply(65);
+/**
+ * Converts a spritesheet index to actual pixel coordinates, given all sprites are square.
+ * @param {number} index The index of the image.
+ * @param {number} cols The number of sprite columns in the sprite sheet.
+ * @param {number} size The width/height of a sprite.
+ * @returns 
+ */
+function getSpritesheetCoordinates(index, cols = 16, size = 65) {
+    return new Vector(index % cols, Math.floor(index / cols)).multiply(size);
 }
 
 const level_1_1 = createLevel();
