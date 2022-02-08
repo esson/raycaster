@@ -539,8 +539,8 @@ function getVerticalCollision(angle, player) {
             // If door is opening or closing, we check if we hit it.
             if (door.action === DOOR_CLOSED || nextY + halfStepY - Math.floor(nextY + halfStepY) > door.position) {
 
-                color = door.darkColor;
-                sprite = door.darkSprite;
+                color = door.color;
+                sprite = door.sprite;
                 spriteOffsetX = -door.position;
 
                 nextX += halfStepX;
