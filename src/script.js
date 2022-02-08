@@ -637,10 +637,11 @@ function movePlayer(delta) {
 
     if (controls.action) {
 
-        let doorX = Math.floor(player.x + Math.cos(player.angle));
-        let doorY = Math.floor(player.y + Math.sin(player.angle));
+        let actionX = Math.floor(player.x + Math.cos(player.angle));
+        let actionY = Math.floor(player.y + Math.sin(player.angle));
 
-        let door = DOORS[doorY][doorX];
+        // Check if there's a door to action
+        let door = DOORS[actionY][actionX];
 
         if (door) {
             switch (door.action) {
@@ -653,6 +654,13 @@ function movePlayer(delta) {
                     door.action = DOOR_CLOSING;
                     break;
             }
+        }
+        
+        // Check if there's a wall to action
+        let wall = WALLS[actionY][actionX];
+
+        if (wall && wall.next) {
+            WALLS[actionY][actionX] = wall.next;
         }
 
         controls.action = false;

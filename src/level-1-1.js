@@ -42,9 +42,9 @@ function createLevel() {
         '1   1   1   1                   2   2         2   2         2  ',
         '1   11111   1                   2   2         2             2  ',
         '1   11111   1111111111111       2   2         2   2         2  ',
-        '1                1      111     2   2         222222 2 2 2 22  ',
-        '1                         1     2   2               2 2 2 2    ',
-        '1                1      111     2   2                          ',
+        '1                1      181     2   2         222222 2 2 2 22  ',
+        '1                         a     2   2               2 2 2 2    ',
+        '1                1      181     2   2                          ',
         '111111111111111111 111111       2   2                          ',
         '          11  1     1      2222222 2222222                     ',
         '         1    1  1 1       2    2   2    2                     ',
@@ -63,10 +63,23 @@ function createLevel() {
     ];
 
     const wallSprites = {
-        '1': { color: '#797979', darkColor: '#616161', sprite: 0, darkSprite: 1 }, // Stone Wall
+        '1': { color: '#797979', darkColor: '#616161', sprite:  0, darkSprite:  1 }, // Stone Wall
         '2': { color: '#09096f', darkColor: '#070759', sprite: 14, darkSprite: 15 }, // Blue Stone Wall
         '3': { color: '#604220', darkColor: '#4d351a', sprite: 22, darkSprite: 23 }, // Wood Panel Wall
+        '8': { color: '#797979', darkColor: '#616161', sprite: 40, darkSprite: 40 }, // Elevator Side Wall
+        'a': { color: '#797979', darkColor: '#616161', sprite: 43, darkSprite: 43, next: 'b' }, // Elevator Controls Off Wall
+        'b': { color: '#797979', darkColor: '#616161', sprite: 41, darkSprite: 41, next: 'a' }, // Elevator Controls On Wall
     };
+
+    // Link walls that references each other, like a toggle switch
+    for (const key in wallSprites) {
+        if (Object.hasOwnProperty.call(wallSprites, key)) {
+            const wallSprite = wallSprites[key];
+            if (wallSprite.next) {
+                wallSprite.next = wallSprites[wallSprite.next];
+            }
+        }
+    }
 
     const doors = [
         '                            -------------                      ',
@@ -218,11 +231,11 @@ function createLevel() {
 }
 
 function mapLiteralToSpriteObject(spriteObjects, shared = false, coordinates = false) {
-    
+
     if (coordinates) {
         return (row, y) => row.split('').map((col, x) => col === ' ' || col === '-' ? undefined : { ...spriteObjects[col], x: parseInt(x) + .5, y: y + .5 });
     }
-    
+
     if (shared) {
         return (y) => y.split('').map(x => x === ' ' || x === '-' ? undefined : spriteObjects[x]);
     }
