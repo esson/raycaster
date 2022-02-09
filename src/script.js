@@ -15,8 +15,9 @@ const DEG_TO_PI = PI / 180;
 const SCREEN_SCALE = 2.25;
 const SCREEN_WIDTH = 640 * SCREEN_SCALE;
 const SCREEN_HEIGHT = 480 * SCREEN_SCALE;
-
 const SCREEN_SAFEZONE = 10;
+
+const SCREEN_BACKGROUND = '#004241';
 
 const FOV = 70 * DEG_TO_PI;
 const WALL_HEIGHT = SCREEN_HEIGHT / 240;
@@ -70,6 +71,23 @@ let SHOW_GRAPHS = JSON.parse(localStorage.getItem('SHOW_GRAPHS')) ?? true;
 let RENDER_SPRITES = JSON.parse(localStorage.getItem('RENDER_SPRITES')) ?? true;
 let RENDER_INTERLACED = JSON.parse(localStorage.getItem('RENDER_INTERLACED')) ?? true;
 let WALL_COLLISION = JSON.parse(localStorage.getItem('WALL_COLLISION')) ?? true;
+let GAME_DISPLAY = JSON.parse(localStorage.getItem('GAME_DISPLAY')) ?? 1;
+
+// State Save
+//
+
+window.addEventListener('unload', (e) => {
+
+    localStorage.setItem('player', JSON.stringify(player));
+
+    localStorage.setItem('SHOW_DEBUG', JSON.stringify(SHOW_DEBUG));
+    localStorage.setItem('SHOW_GRAPHS', JSON.stringify(SHOW_GRAPHS));
+
+    localStorage.setItem('RENDER_INTERLACED', JSON.stringify(RENDER_INTERLACED));
+    localStorage.setItem('RENDER_SPRITES', JSON.stringify(RENDER_SPRITES));
+
+    localStorage.setItem('GAME_DISPLAY', JSON.stringify(GAME_DISPLAY));
+});
 
 // Level / Map / Doors / Objects
 //
@@ -221,7 +239,11 @@ const keyboardToFunctionMap = {
     // Toggle Smoothing
     KeyP: () => setMessageText('SMOOTHING', ctx.imageSmoothingEnabled = !ctx.imageSmoothingEnabled),
     // Reset
-    KeyR: () => (setMessageText('PLAYER RESET'), player = { ...PLAYER_DEFAULT, x: LEVEL.spawn.x, y: LEVEL.spawn.y })
+    KeyR: () => (setMessageText('PLAYER RESET'), player = { ...PLAYER_DEFAULT, x: LEVEL.spawn.x, y: LEVEL.spawn.y }),
+    // Zoom In
+    NumpadAdd: () => GAME_DISPLAY = Math.min(GAME_DISPLAY + 1, 3),
+    // Zoom Out
+    NumpadSubtract: () => GAME_DISPLAY = Math.max(GAME_DISPLAY - 1, 1)
 }
 
 document.addEventListener('keydown', (e) => {
@@ -250,20 +272,6 @@ document.addEventListener('keyup', (e) => {
     if (e.code in keyboardToFunctionMap) {
         keyboardToFunctionMap[e.code]();
     }
-});
-
-// State Save
-//
-
-window.addEventListener('unload', (e) => {
-
-    localStorage.setItem('player', JSON.stringify(player));
-
-    localStorage.setItem('SHOW_DEBUG', JSON.stringify(SHOW_DEBUG));
-    localStorage.setItem('SHOW_GRAPHS', JSON.stringify(SHOW_GRAPHS));
-
-    localStorage.setItem('RENDER_INTERLACED', JSON.stringify(RENDER_INTERLACED));
-    localStorage.setItem('RENDER_SPRITES', JSON.stringify(RENDER_SPRITES));
 });
 
 // Player
@@ -298,6 +306,11 @@ function loop() {
 
         if (!controls.pause) {
 
+            const gx = SCREEN_WIDTH / 2 - 320 * GAME_DISPLAY / 2;
+            const gy = (SCREEN_HEIGHT - 200) / 2 - 240 * GAME_DISPLAY / 2;
+            const gw = 320 * GAME_DISPLAY;
+            const gh = 240 * GAME_DISPLAY;
+
             let rays;
 
             // Calculations
@@ -305,7 +318,7 @@ function loop() {
             calcPerf.start();
 
             update(delta);
-            rays = getRays(player);
+            rays = getRays(player, gw);
 
             calcPerf.stop();
 
@@ -313,7 +326,7 @@ function loop() {
             // ------------------------------
             drawPerf.start();
 
-            render(rays);
+            render(rays, gx, gy, gw, gh);
 
             drawPerf.stop();
 
@@ -338,14 +351,41 @@ function update(delta) {
     moveDoors(delta);
 }
 
-function render(rays) {
+function render(rays, x, y, w, h) {
 
-    if (!RENDER_INTERLACED) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Because interlaced rendering of game requires that we don't clear,
+    // we clear and fill around the game rect.
+
+    ctx.fillStyle = SCREEN_BACKGROUND;
+
+    if (RENDER_INTERLACED || frameCounter > 0) {
+        clearAround(ctx, x, y, w, h);
+        fillRectAround(ctx, x, y, w, h);
+    } else {
+        ctx.clearRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+        ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+
+        ctx.fillStyle = 'black';
+        ctx.fillRect(x, y, w, h);
     }
 
-    renderScene(ctx, rays);
-    renderObjects(ctx, rays, OBJECTS);
+    // Draw game border
+    drawInset(ctx, x, y, w, h, 2, '#05716e', '#000000');
+
+    // Add clipping to prevent the game from rendering outside it's 
+    // display area.
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    ctx.clip();
+
+    // Render the game screen.
+    renderScene(ctx, rays, x, y, w, h);
+    renderObjects(ctx, rays, OBJECTS, x, y, w, h);
+
+    // Restore to stop clipping.
+    ctx.restore();
 
     if (controls.map > MINIMAP_NONE) {
         renderMap(ctx, WALLS, rays, controls.map === MINIMAP_LARGE);
@@ -564,13 +604,13 @@ function getVerticalCollision(angle, player) {
     };
 }
 
-function getRays(player) {
+function getRays(player, w) {
 
     const start = player.angle - FOV / 2;
-    const step = FOV / SCREEN_WIDTH;
+    const step = FOV / w;
     const rays = [];
 
-    for (let i = 0; i < SCREEN_WIDTH; i++) {
+    for (let i = 0; i < w; i++) {
 
         const angle = start + step * i;
         const hCollision = getHorizontalCollision(angle, player);
@@ -655,7 +695,7 @@ function movePlayer(delta) {
                     break;
             }
         }
-        
+
         // Check if there's a wall to action
         let wall = WALLS[actionY][actionX];
 
@@ -764,7 +804,16 @@ function isIntersectingWall(x, y) {
     return false;
 }
 
-function renderScene(ctx, rays) {
+/**
+ * 
+ * @param {CanvasRenderingContext2D} ctx 
+ * @param {*} rays 
+ * @param {*} dx 
+ * @param {*} dy 
+ * @param {*} dw 
+ * @param {*} dh 
+ */
+function renderScene(ctx, rays, dx, dy, dw, dh) {
 
     let x = RENDER_INTERLACED && frameCounter % 2 === 0 ? 1 : 0;
     let increment = RENDER_INTERLACED ? 2 : 1;
@@ -774,28 +823,39 @@ function renderScene(ctx, rays) {
         const ray = rays[x];
 
         const distance = getViewCorrectedDistance(ray.distance, ray.angle, player.angle);
-        const height = WALL_HEIGHT / distance * 277;
-        const y = SCREEN_HEIGHT / 2 - height / 2;
+        const height = dh / 240 / distance * 277;
+        const y = dh / 2 - height / 2;
 
         // Ceiling
         ctx.fillStyle = CEILING_COLOR;
-        ctx.fillRect(x, 0, 1, y);
+        ctx.fillRect(dx + x, dy + 0, 1, y);
 
         // Floor
         ctx.fillStyle = FLOOR_COLOR;
-        ctx.fillRect(x, y + height, 1, y);
+        ctx.fillRect(dx + x, dy + y + height, 1, y);
 
         // Wall
         if (!RENDER_SPRITES || !ray.sprite) {
             ctx.fillStyle = ray.color ?? '#000';
-            ctx.fillRect(x, y, 1, height);
+            ctx.fillRect(dx + x, dy + y, 1, height);
         } else {
-            ctx.drawImage(spritesheet, ray.sprite.x + ray.spriteX, ray.sprite.y, 1, SPRITE_SIZE, x, y, 1, height);
+            ctx.drawImage(spritesheet, ray.sprite.x + ray.spriteX, ray.sprite.y, 1, SPRITE_SIZE, dx + x, dy + y, 1, height);
         }
     }
 }
 
-function renderObjects(ctx, rays, objects) {
+/**
+ * 
+ * @param {CanvasRenderingContext2D} ctx 
+ * @param {*} rays 
+ * @param {*} objects 
+ * @param {*} dx 
+ * @param {*} dy 
+ * @param {*} dw 
+ * @param {*} dh 
+ * @returns 
+ */
+function renderObjects(ctx, rays, objects, dx, dy, dw, dh) {
 
     // TODO: Sort the objects by distance, furthest to nearest.
 
@@ -815,17 +875,15 @@ function renderObjects(ctx, rays, objects) {
             }
 
             const angle = fixAngle(Math.atan2(object.y - player.y, object.x - player.x));
-            const size = WALL_HEIGHT / distance * 277;
-            const x = Math.floor(SCREEN_WIDTH / 2 - (player.angle - angle) * SCREEN_WIDTH / FOV - size / 2);
+            const size = dh / 240 / distance * 277;
+            const x = Math.floor(dw / 2 - (player.angle - angle) * dw / FOV - size / 2);
 
             for (let j = 0; j < size; j++) {
                 if (x + j >= 0 && x + j < rays.length && rays[x + j].distance > distance) {
-                    ctx.drawImage(spritesheet, object.sprite.x + Math.floor(SPRITE_SIZE / size * j), object.sprite.y, 1, SPRITE_SIZE, x + j, SCREEN_HEIGHT / 2 - size / 2, 1, size);
+                    ctx.drawImage(spritesheet, object.sprite.x + Math.floor(SPRITE_SIZE / size * j), object.sprite.y, 1, SPRITE_SIZE, dx + x + j, dy + dh / 2 - size / 2, 1, size);
                 }
             }
         }
-
-
     }
 }
 
@@ -989,4 +1047,44 @@ function renderMessage(ctx, text) {
     ctx.textBaseline = 'middle';
 
     ctx.fillText(text, SCREEN_WIDTH / 2, SCREEN_SAFEZONE + OSD_MIDDLE);
+}
+
+function clearAround(ctx, x, y, w, h) {
+
+    ctx.clearRect(0, 0, SCREEN_WIDTH, y);
+    ctx.clearRect(0, y, x, h);
+    ctx.clearRect(x + w, y, x, h);
+    ctx.clearRect(0, y + h, SCREEN_WIDTH, y);
+}
+
+function fillRectAround(ctx, x, y, w, h) {
+
+    // Top
+    ctx.fillRect(0, 0, SCREEN_WIDTH, y);
+    // Left
+    ctx.fillRect(0, y, x, h);
+    // Right
+    ctx.fillRect(x + w, y, SCREEN_WIDTH - x + w, h);
+    // Bottom
+    ctx.fillRect(0, y + h, SCREEN_WIDTH, SCREEN_HEIGHT - y + h);
+}
+
+function drawInset(ctx, x, y, w, h, lineWidth, color, shadowColor) {
+    
+    const offset = lineWidth / 2;
+
+    ctx.lineWidth = lineWidth;
+    ctx.strokeStyle = shadowColor;
+    ctx.beginPath();
+    ctx.moveTo(x - offset, y + h + offset);
+    ctx.lineTo(x - offset, y - offset);
+    ctx.lineTo(x + w + offset, y - offset);
+    ctx.stroke();
+
+    ctx.strokeStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x + w + offset, y - offset);
+    ctx.lineTo(x + w + offset, y + h + offset);
+    ctx.lineTo(x - offset, y + h + offset);
+    ctx.stroke();
 }
