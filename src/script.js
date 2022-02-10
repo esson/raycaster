@@ -27,9 +27,6 @@ const FOV = FOV_DEG * DEG_TO_PI;
 const WALL_HEIGHT_RATIO = GAME_WIDTH / GAME_HEIGHT / FOV_DEG * 51;
 const SPRITE_SIZE = 64;
 
-const CEILING_COLOR = '#333';
-const FLOOR_COLOR = '#777';
-
 const OSD_BACKGORUND = '#00000033';
 const OSD_COLOR = '#fff';
 const OSD_FONT = '12px monospace';
@@ -823,11 +820,11 @@ function renderScene(ctx, rays, dx, dy, dw, dh) {
         const y = dh / 2 - height / 2;
 
         // Ceiling
-        ctx.fillStyle = CEILING_COLOR;
+        ctx.fillStyle = LEVEL.ceiling;
         ctx.fillRect(dx + x, dy + 0, 1, y);
 
         // Floor
-        ctx.fillStyle = FLOOR_COLOR;
+        ctx.fillStyle = LEVEL.floor;
         ctx.fillRect(dx + x, dy + y + height, 1, y);
 
         // Wall
