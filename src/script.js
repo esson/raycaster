@@ -871,9 +871,9 @@ function renderObjects(ctx, rays, visibleCells, objects, dx, dy, dw, dh) {
             return;
         }
 
-        const angle = fixAngle(Math.atan2(object.y - player.y, object.x - player.x));
+        const angle = fixAngle(player.angle - Math.atan2(object.y - player.y, object.x - player.x));
         const size = dh / distance * WALL_HEIGHT_RATIO;
-        const x = Math.floor(dw / 2 - (player.angle - angle) * dw / FOV - size / 2);
+        const x = Math.floor(dw / 2 - size / 2 - angle * dw / FOV);
 
         for (let j = 0; j < size; j++) {
             if (x + j >= 0 && x + j < rays.length && rays[x + j].distance > distance) {
