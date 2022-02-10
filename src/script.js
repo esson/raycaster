@@ -294,7 +294,7 @@ function loop() {
             // ------------------------------
             drawPerf.start();
 
-            render(rays, gx, gy, gw, gh);
+            render(rays.rays, rays.visibleCells, gx, gy, gw, gh);
 
             drawPerf.stop();
 
@@ -319,7 +319,7 @@ function update(delta) {
     moveDoors(delta);
 }
 
-function render(rays, x, y, w, h) {
+function render(rays, visibleCells, x, y, w, h) {
 
     // Because interlaced rendering of game requires that we don't clear,
     // we clear and fill around the game rect.
@@ -350,7 +350,7 @@ function render(rays, x, y, w, h) {
 
     // Render the game screen.
     renderScene(ctx, rays, x, y, w, h);
-    renderObjects(ctx, rays, OBJECTS, x, y, w, h);
+    renderObjects(ctx, rays, visibleCells, OBJECTS, x, y, w, h);
 
     // Restore to stop clipping.
     ctx.restore();
@@ -408,7 +408,7 @@ function isOutOfBounds(sx, sy, dw, dh) {
     return sx < 0 || sx >= dw || sy < 0 || sy >= dh;
 }
 
-function getHorizontalCollision(angle, player) {
+function getHorizontalCollision(angle, player, visibleCells) {
 
     const up = Math.abs(Math.floor(angle / PI) % 2) > 0;
 
@@ -439,6 +439,8 @@ function getHorizontalCollision(angle, player) {
         if (isOutOfBounds(cellX, cellY, WALLS[0].length, WALLS.length)) {
             break;
         }
+
+        visibleCells[cellY][cellX] = true;
 
         wall = WALLS[cellY][cellX];
 
@@ -490,7 +492,7 @@ function getHorizontalCollision(angle, player) {
     };
 }
 
-function getVerticalCollision(angle, player) {
+function getVerticalCollision(angle, player, visibleCells) {
 
     const right = Math.abs(Math.floor((angle - HALF_PI) / PI) % 2) > 0;
 
@@ -521,6 +523,8 @@ function getVerticalCollision(angle, player) {
         if (isOutOfBounds(cellX, cellY, WALLS[0].length, WALLS.length)) {
             break;
         }
+
+        visibleCells[cellY][cellX] = true;
 
         wall = WALLS[cellY][cellX];
 
@@ -577,17 +581,28 @@ function getRays(player, w) {
     const start = player.angle - FOV / 2;
     const step = FOV / w;
     const rays = [];
+    const visibleCells = [];
+
+    for (let y = 0; y < WALLS.length; y++) {
+        visibleCells[y] = [];
+        for (let x = 0; x < WALLS[y].length; x++) {
+            visibleCells[y][x] = 0;
+        }
+    }
 
     for (let i = 0; i < w; i++) {
 
         const angle = start + step * i;
-        const hCollision = getHorizontalCollision(angle, player);
-        const vCollision = getVerticalCollision(angle, player);
+        const hCollision = getHorizontalCollision(angle, player, visibleCells);
+        const vCollision = getVerticalCollision(angle, player, visibleCells);
 
         rays.push(hCollision.distance > vCollision.distance ? vCollision : hCollision);
     }
 
-    return rays;
+    return {
+        rays,
+        visibleCells
+    };
 }
 
 function movePlayer(delta) {
@@ -824,12 +839,17 @@ function renderScene(ctx, rays, dx, dy, dw, dh) {
  * @param {*} dh 
  * @returns 
  */
-function renderObjects(ctx, rays, objects, dx, dy, dw, dh) {
+function renderObjects(ctx, rays, visibleCells, objects, dx, dy, dw, dh) {
 
     // TODO: Sort the objects by distance, furthest to nearest.
 
     for (let mapY = 0; mapY < objects.length; mapY++) {
         for (let mapX = 0; mapX < objects[mapY].length; mapX++) {
+            
+            if (!visibleCells[mapY][mapX]) {
+                continue;
+            }
+
             const object = objects[mapY][mapX];
 
             if (!object) {
