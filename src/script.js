@@ -431,7 +431,7 @@ function getHorizontalCollision(angle, player, visibleCells) {
     let sprite;
     let spriteOffsetX = 0;
 
-    const cellsHit = [];
+    const cells = [];
 
     while (true) {
 
@@ -441,9 +441,6 @@ function getHorizontalCollision(angle, player, visibleCells) {
         if (isOutOfBounds(cellX, cellY, WALLS[0].length, WALLS.length)) {
             break;
         }
-
-        cellsHit.push([cellX, cellY]);
-        //visibleCells[cellY][cellX] = true;
 
         wall = WALLS[cellY][cellX];
 
@@ -481,6 +478,8 @@ function getHorizontalCollision(angle, player, visibleCells) {
             }
         }
 
+        cells.push([cellX, cellY]);
+
         nextX += stepX;
         nextY += stepY;
     }
@@ -492,7 +491,7 @@ function getHorizontalCollision(angle, player, visibleCells) {
         sprite: sprite,
         spriteX: (spriteOffsetX + nextX - Math.floor(nextX)) * SPRITE_SIZE,
         vertical: false,
-        cells: cellsHit
+        cells: cells
     };
 }
 
@@ -519,7 +518,7 @@ function getVerticalCollision(angle, player, visibleCells) {
     let sprite;
     let spriteOffsetX = 0;
 
-    const cellsHit = [];
+    const cells = [];
 
     while (true) {
 
@@ -529,9 +528,6 @@ function getVerticalCollision(angle, player, visibleCells) {
         if (isOutOfBounds(cellX, cellY, WALLS[0].length, WALLS.length)) {
             break;
         }
-
-        cellsHit.push([cellX, cellY]);
-        //visibleCells[cellY][cellX] = true;
 
         wall = WALLS[cellY][cellX];
 
@@ -569,6 +565,8 @@ function getVerticalCollision(angle, player, visibleCells) {
             }
         }
 
+        cells.push([cellX, cellY]);
+
         nextX += stepX;
         nextY += stepY;
     }
@@ -580,7 +578,7 @@ function getVerticalCollision(angle, player, visibleCells) {
         sprite: sprite,
         spriteX: (spriteOffsetX + nextY - Math.floor(nextY)) * SPRITE_SIZE,
         vertical: true,
-        cells: cellsHit
+        cells: cells
     };
 }
 
@@ -601,14 +599,14 @@ function getRays(player, w) {
     for (let i = 0; i < w; i++) {
 
         const angle = start + step * i;
-        const hCollision = getHorizontalCollision(angle, player, visibleCells);
-        const vCollision = getVerticalCollision(angle, player, visibleCells);
+        const hCollision = getHorizontalCollision(angle, player);
+        const vCollision = getVerticalCollision(angle, player);
 
         const collision = hCollision.distance > vCollision.distance ? vCollision : hCollision;
 
         collision.cells.forEach(([x, y]) => {
             visibleCells[y][x] = true;
-        })
+        });
 
         rays.push(collision);
     }
