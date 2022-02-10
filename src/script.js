@@ -17,10 +17,14 @@ const SCREEN_WIDTH = 640 * SCREEN_SCALE;
 const SCREEN_HEIGHT = 480 * SCREEN_SCALE;
 const SCREEN_SAFEZONE = 10;
 
+const GAME_WIDTH = 320;
+const GAME_HEIGHT = 210;
+
 const SCREEN_BACKGROUND = '#004241';
 
-const FOV = 70 * DEG_TO_PI;
-const WALL_HEIGHT = SCREEN_HEIGHT / 240;
+const FOV_DEG = 75;
+const FOV = FOV_DEG * DEG_TO_PI;
+const WALL_HEIGHT_RATIO = GAME_WIDTH / GAME_HEIGHT / FOV_DEG * 51;
 const SPRITE_SIZE = 64;
 
 const CEILING_COLOR = '#333';
@@ -31,6 +35,8 @@ const OSD_COLOR = '#fff';
 const OSD_FONT = '12px monospace';
 const OSD_HEIGHT = 20;
 const OSD_MIDDLE = OSD_HEIGHT / 2;
+
+const PLAYER_SIZE = 1 / 4;
 
 const MOVE_SLOW = .04;
 const MOVE_NORMAL = .06;
@@ -268,10 +274,10 @@ function loop() {
 
         if (!controls.pause) {
 
-            const gx = SCREEN_WIDTH / 2 - 320 * GAME_DISPLAY / 2;
-            const gy = (SCREEN_HEIGHT - 200) / 2 - 240 * GAME_DISPLAY / 2;
-            const gw = 320 * GAME_DISPLAY;
-            const gh = 240 * GAME_DISPLAY;
+            const gx = SCREEN_WIDTH / 2 - GAME_WIDTH * GAME_DISPLAY / 2;
+            const gy = (SCREEN_HEIGHT - 200) / 2 - GAME_HEIGHT * GAME_DISPLAY / 2;
+            const gw = GAME_WIDTH * GAME_DISPLAY;
+            const gh = GAME_HEIGHT * GAME_DISPLAY;
 
             let rays;
 
@@ -675,10 +681,10 @@ function movePlayer(delta) {
         let moveX = Math.cos(player.angle) * player.speed;
         let moveY = Math.sin(player.angle) * player.speed;
 
-        if (!isIntersectingWall(player.x + moveX, player.y)) {
+        if (tryMovePlayer(player.x + moveX, player.y)) {
             player.x += moveX;
         }
-        if (!isIntersectingWall(player.x, player.y + moveY)) {
+        if (tryMovePlayer(player.x, player.y + moveY)) {
             player.y += moveY;
         }
     }
@@ -688,10 +694,10 @@ function movePlayer(delta) {
         let moveX = Math.cos(player.angle - HALF_PI) * player.side;
         let moveY = Math.sin(player.angle - HALF_PI) * player.side;
 
-        if (!isIntersectingWall(player.x + moveX, player.y)) {
+        if (tryMovePlayer(player.x + moveX, player.y)) {
             player.x += moveX;
         }
-        if (!isIntersectingWall(player.x, player.y + moveY)) {
+        if (tryMovePlayer(player.x, player.y + moveY)) {
             player.y += moveY;
         }
     }
@@ -742,28 +748,29 @@ function moveDoors(delta) {
     }
 }
 
-function isIntersectingWall(x, y) {
+function tryMovePlayer(x, y) {
 
     if (!WALL_COLLISION) {
-        return false;
-    }
-
-    const mapX = Math.floor(x);
-    const mapY = Math.floor(y);
-
-    const wall = WALLS[mapY][mapX];
-
-    if (wall) {
         return true;
     }
 
-    const door = DOORS[mapY][mapX];
+    var xl = Math.floor(x - PLAYER_SIZE);
+    var yl = Math.floor(y - PLAYER_SIZE);
+    var xh = Math.floor(x + PLAYER_SIZE);
+    var yh = Math.floor(y + PLAYER_SIZE);
 
-    if (door && door.action !== DOOR_OPEN) {
-        return true;
+    for (let y = yl; y <= yh; y++) {
+        for (let x = xl; x <= xh; x++) {
+            if (WALLS[y][x]) {
+                return false;
+            }
+            if (DOORS[y][x] && DOORS[y][x].action !== DOOR_OPEN) {
+                return false;
+            }
+        }
     }
 
-    return false;
+    return true;
 }
 
 /**
@@ -785,7 +792,7 @@ function renderScene(ctx, rays, dx, dy, dw, dh) {
         const ray = rays[x];
 
         const distance = getViewCorrectedDistance(ray.distance, ray.angle, player.angle);
-        const height = dh / 240 / distance * 277;
+        const height = dh / distance * WALL_HEIGHT_RATIO;
         const y = dh / 2 - height / 2;
 
         // Ceiling
@@ -837,7 +844,7 @@ function renderObjects(ctx, rays, objects, dx, dy, dw, dh) {
             }
 
             const angle = fixAngle(Math.atan2(object.y - player.y, object.x - player.x));
-            const size = dh / 240 / distance * 277;
+            const size = dh / distance * WALL_HEIGHT_RATIO;
             const x = Math.floor(dw / 2 - (player.angle - angle) * dw / FOV - size / 2);
 
             for (let j = 0; j < size; j++) {
@@ -945,11 +952,11 @@ function renderMap(ctx, map, rays, largeMap) {
     // Torso
     ctx.fillStyle = 'black';
     ctx.beginPath();
-    ctx.ellipse(position.x, position.y, scale / 2, scale / 3, player.angle + HALF_PI, 0, DOUBLE_PI)
+    ctx.ellipse(position.x, position.y, PLAYER_SIZE * scale * 2, PLAYER_SIZE * scale / 3 * 2, player.angle + HALF_PI, 0, DOUBLE_PI)
     ctx.fill();
 
     // Direction
-    const destination = new Vector(Math.cos(player.angle), Math.sin(player.angle)).multiply(scale).add(position);
+    const destination = new Vector(Math.cos(player.angle), Math.sin(player.angle)).multiply(PLAYER_SIZE * scale * 2).add(position);
     ctx.strokeStyle = 'black';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -960,7 +967,7 @@ function renderMap(ctx, map, rays, largeMap) {
     // Head
     ctx.fillStyle = 'orange';
     ctx.beginPath();
-    ctx.arc(position.x, position.y, scale / 4, 0, DOUBLE_PI);
+    ctx.arc(position.x, position.y, PLAYER_SIZE * scale / 4 * 2, 0, DOUBLE_PI);
     ctx.fill();
 
     // Reset globalAlpha
@@ -1032,7 +1039,7 @@ function fillRectAround(ctx, x, y, w, h) {
 }
 
 function drawInset(ctx, x, y, w, h, lineWidth, color, shadowColor) {
-    
+
     const offset = lineWidth / 2;
 
     ctx.lineWidth = lineWidth;
