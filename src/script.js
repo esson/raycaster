@@ -431,6 +431,8 @@ function getHorizontalCollision(angle, player, visibleCells) {
     let sprite;
     let spriteOffsetX = 0;
 
+    const cellsHit = [];
+
     while (true) {
 
         const cellX = Math.floor(nextX);
@@ -440,7 +442,8 @@ function getHorizontalCollision(angle, player, visibleCells) {
             break;
         }
 
-        visibleCells[cellY][cellX] = true;
+        cellsHit.push([cellX, cellY]);
+        //visibleCells[cellY][cellX] = true;
 
         wall = WALLS[cellY][cellX];
 
@@ -488,7 +491,8 @@ function getHorizontalCollision(angle, player, visibleCells) {
         color: color,
         sprite: sprite,
         spriteX: (spriteOffsetX + nextX - Math.floor(nextX)) * SPRITE_SIZE,
-        vertical: false
+        vertical: false,
+        cells: cellsHit
     };
 }
 
@@ -515,6 +519,8 @@ function getVerticalCollision(angle, player, visibleCells) {
     let sprite;
     let spriteOffsetX = 0;
 
+    const cellsHit = [];
+
     while (true) {
 
         const cellX = right ? Math.floor(nextX) : Math.floor(nextX) - 1;;
@@ -524,7 +530,8 @@ function getVerticalCollision(angle, player, visibleCells) {
             break;
         }
 
-        visibleCells[cellY][cellX] = true;
+        cellsHit.push([cellX, cellY]);
+        //visibleCells[cellY][cellX] = true;
 
         wall = WALLS[cellY][cellX];
 
@@ -572,7 +579,8 @@ function getVerticalCollision(angle, player, visibleCells) {
         color: color,
         sprite: sprite,
         spriteX: (spriteOffsetX + nextY - Math.floor(nextY)) * SPRITE_SIZE,
-        vertical: true
+        vertical: true,
+        cells: cellsHit
     };
 }
 
@@ -596,7 +604,13 @@ function getRays(player, w) {
         const hCollision = getHorizontalCollision(angle, player, visibleCells);
         const vCollision = getVerticalCollision(angle, player, visibleCells);
 
-        rays.push(hCollision.distance > vCollision.distance ? vCollision : hCollision);
+        const collision = hCollision.distance > vCollision.distance ? vCollision : hCollision;
+
+        collision.cells.forEach(([x, y]) => {
+            visibleCells[y][x] = true;
+        })
+
+        rays.push(collision);
     }
 
     return {
@@ -842,35 +856,30 @@ function renderScene(ctx, rays, dx, dy, dw, dh) {
 function renderObjects(ctx, rays, visibleCells, objects, dx, dy, dw, dh) {
 
     // TODO: Sort the objects by distance, furthest to nearest.
+    const visibleObjects = objects.flatMap((row, y) => row.filter((obj, x) => obj && visibleCells[y][x]));
 
-    for (let mapY = 0; mapY < objects.length; mapY++) {
-        for (let mapX = 0; mapX < objects[mapY].length; mapX++) {
-            
-            if (!visibleCells[mapY][mapX]) {
-                continue;
-            }
+    for (let i = 0; i < visibleObjects.length; i++) {
 
-            const object = objects[mapY][mapX];
+        const object = visibleObjects[i];
 
-            if (!object) {
-                continue;
-            }
+        if (!object) {
+            continue;
+        }
 
-            const distance = Vector.distance(player.x, player.y, object.x, object.y);
+        const distance = Vector.distance(player.x, player.y, object.x, object.y);
 
-            // Don't draw too close
-            if (distance < .5) {
-                return;
-            }
+        // Don't draw too close
+        if (distance < .5) {
+            return;
+        }
 
-            const angle = fixAngle(Math.atan2(object.y - player.y, object.x - player.x));
-            const size = dh / distance * WALL_HEIGHT_RATIO;
-            const x = Math.floor(dw / 2 - (player.angle - angle) * dw / FOV - size / 2);
+        const angle = fixAngle(Math.atan2(object.y - player.y, object.x - player.x));
+        const size = dh / distance * WALL_HEIGHT_RATIO;
+        const x = Math.floor(dw / 2 - (player.angle - angle) * dw / FOV - size / 2);
 
-            for (let j = 0; j < size; j++) {
-                if (x + j >= 0 && x + j < rays.length && rays[x + j].distance > distance) {
-                    ctx.drawImage(spritesheet, object.sprite.x + Math.floor(SPRITE_SIZE / size * j), object.sprite.y, 1, SPRITE_SIZE, dx + x + j, dy + dh / 2 - size / 2, 1, size);
-                }
+        for (let j = 0; j < size; j++) {
+            if (x + j >= 0 && x + j < rays.length && rays[x + j].distance > distance) {
+                ctx.drawImage(spritesheet, object.sprite.x + Math.floor(SPRITE_SIZE / size * j), object.sprite.y, 1, SPRITE_SIZE, dx + x + j, dy + dh / 2 - size / 2, 1, size);
             }
         }
     }
@@ -1024,7 +1033,7 @@ function renderCoordinates(ctx) {
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
 
-    ctx.fillText(`${player.x.toFixed(0)},${player.y.toFixed(0)}`, SCREEN_SAFEZONE * 2, SCREEN_SAFEZONE + OSD_MIDDLE);
+    ctx.fillText(`${player.x.toFixed(0)},${player.y.toFixed(0)} ${(player.angle).toFixed(2)}`, SCREEN_SAFEZONE * 2, SCREEN_SAFEZONE + OSD_MIDDLE);
 }
 
 function renderMessage(ctx, text) {
