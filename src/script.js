@@ -103,46 +103,8 @@ const OBJECTS = LEVEL.objects;
 
 const spritesheet = new Image();
 spritesheet.src = LEVEL.spriteUrl;
-spritesheet.onload = () => {
-
-    // Remove the loader to prevent looping behaviour.
-    spritesheet.onload = null;
-
-    // The sprite image doesn't contain opacity data, 
-    // so we need to turn all pink colors to 0 alpha.
-    // To do that we create a canvas and draw the 
-    // spritesheet onto it. Then we can get the image data
-    // from the canvas and modify it, put the modified
-    // data back onto the canvas and get a Data URL to
-    // apply to the spritesheet ImageElement.
-
-    const canvas = document.createElement('canvas');
-    canvas.width = spritesheet.width;
-    canvas.height = spritesheet.height;
-
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(spritesheet, 0, 0);
-
-    const imageData = ctx.getImageData(0, 0, spritesheet.width, spritesheet.height);
-    const data = imageData.data;
-
-    // Convert rgba(152, 0, 136, 255) to transparent.
-    for (let i = 0; i < data.length; i += 4) {
-
-        if (data[i] !== 152 || data[i + 1] !== 0 || data[i + 2] !== 136) {
-            continue;
-        }
-
-        data[i + 3] = 0;
-    }
-
-    ctx.putImageData(imageData, 0, 0);
-    spritesheet.src = canvas.toDataURL();
-
-    canvas.remove();
-
-    startGame();
-};
+// Start the game once the image has loaded.
+spritesheet.onload = () => startGame();
 
 // Canvas
 //
