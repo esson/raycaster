@@ -24,6 +24,7 @@ export default class PerformanceCounter {
         const min = this.history.reduce((a, x) => Math.min(a, x), max);
         const diffY = max - min;
         const mid = min + diffY / 2;
+        const avg = this.history.reduce((a, x) => a + x, 0) / this.history.length;
 
         const padding = height * .10;
 
@@ -90,7 +91,7 @@ export default class PerformanceCounter {
         ctx.textBaseline = 'top';
 
         ctx.fillStyle = textColor;
-        ctx.fillText(this.name.toUpperCase(), x + padding, y + padding);
+        ctx.fillText(this.name.toUpperCase() + ` (${avg.toFixed(2)} MS)`, x + padding, y + padding);
     }
 
     start() {
