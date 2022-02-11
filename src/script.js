@@ -154,6 +154,7 @@ const controls = {
     turbo: false,
     stealth: false,
     strafe: false,
+    fire: false,
     map: MINIMAP_SMALL,
     action: false,
     pause: false
@@ -164,6 +165,8 @@ const keyboardToControlMap = {
     KeyA: 'left',
     KeyS: 'down',
     KeyD: 'right',
+    KeyZ: 'strafe',
+    KeyX: 'fire',
     ArrowUp: 'up',
     ArrowLeft: 'left',
     ArrowDown: 'down',
@@ -651,8 +654,10 @@ function movePlayer(delta) {
         if (!controls.left && !controls.right) {
             player.side = 0;
         }
+    } else {
+        player.side = 0;
     }
-
+    
 
     // Turning
 
