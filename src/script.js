@@ -486,7 +486,7 @@ function getHorizontalCollision(angle, player, visibleCells) {
         distance: Vector.distance(player.x, player.y, nextX, nextY),
         color: color,
         sprite: sprite,
-        spriteX: (spriteOffsetX + nextX - Math.floor(nextX)) * SPRITE_SIZE,
+        spriteX: up || door ? (spriteOffsetX + nextX - Math.floor(nextX)) * SPRITE_SIZE : (1 - spriteOffsetX + Math.floor(nextX) - nextX) * SPRITE_SIZE,
         vertical: false,
         cells: cells
     };
@@ -573,7 +573,7 @@ function getVerticalCollision(angle, player, visibleCells) {
         distance: Vector.distance(player.x, player.y, nextX, nextY),
         color: color,
         sprite: sprite,
-        spriteX: (spriteOffsetX + nextY - Math.floor(nextY)) * SPRITE_SIZE,
+        spriteX: right || door ? (spriteOffsetX + nextY - Math.floor(nextY)) * SPRITE_SIZE : (1 - spriteOffsetX + Math.floor(nextY) - nextY) * SPRITE_SIZE,
         vertical: true,
         cells: cells
     };
@@ -848,7 +848,7 @@ function renderScene(ctx, rays, dx, dy, dw, dh) {
  * @param {*} dh 
  * @returns 
  */
-function renderObjects(ctx, rays, visibleCells, objects, dx, dy, dw, dh) {
+ function renderObjects(ctx, rays, visibleCells, objects, dx, dy, dw, dh) {
 
     // TODO: Sort the objects by distance, furthest to nearest.
     const visibleObjects = objects.flatMap((row, y) => row.filter((obj, x) => obj && visibleCells[y][x]));
