@@ -848,7 +848,7 @@ function renderScene(ctx, rays, dx, dy, dw, dh) {
  * @param {*} dh 
  * @returns 
  */
- function renderObjects(ctx, rays, visibleCells, objects, dx, dy, dw, dh) {
+function renderObjects(ctx, rays, visibleCells, objects, dx, dy, dw, dh) {
 
     // TODO: Sort the objects by distance, furthest to nearest.
     const visibleObjects = objects.flatMap((row, y) => row.filter((obj, x) => obj && visibleCells[y][x]));
@@ -861,22 +861,38 @@ function renderScene(ctx, rays, dx, dy, dw, dh) {
             continue;
         }
 
-        const distance = Vector.distance(player.x, player.y, object.x, object.y);
-
-        // Don't draw too close
-        if (distance < .5) {
-            return;
-        }
-
+        // Calculate where the sprite is to be rendered in 3D space
         const angle = fixAngle(player.angle - Math.atan2(object.y - player.y, object.x - player.x));
+        const spriteDistance = Vector.distance(player.x, player.y, object.x, object.y);
+        const distance = getViewCorrectedDistance(spriteDistance, player.angle + angle, player.angle);
         const size = dh / distance * WALL_HEIGHT_RATIO;
         const x = Math.floor(dw / 2 - size / 2 - angle * dw / FOV);
 
+        // The left or right may be blocked by walls, so we need to find an x offset and a width of what is to be actually drawn.
+        let slice = null;
+
         for (let j = 0; j < size; j++) {
             if (x + j >= 0 && x + j < rays.length && rays[x + j].distance > distance) {
-                ctx.drawImage(spritesheet, object.sprite.x + Math.floor(SPRITE_SIZE / size * j), object.sprite.y, 1, SPRITE_SIZE, dx + x + j, dy + dh / 2 - size / 2, 1, size);
+                if (!slice) {
+                    slice = {
+                        sx: object.sprite.x + Math.floor(SPRITE_SIZE / size * j),
+                        dx: dx + x + j,
+                        w: 0
+                    };
+                }
+                slice.w++;
+            } else if (slice) {
+                break;
             }
         }
+
+        if (slice) {
+            // Draw the sprite.
+            ctx.drawImage(spritesheet,
+                slice.sx, object.sprite.y, Math.floor(64 / size * slice.w), SPRITE_SIZE,
+                slice.dx, dy + dh / 2 - size / 2, slice.w, size)
+        }
+
     }
 }
 
