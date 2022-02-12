@@ -98,6 +98,7 @@ window.addEventListener('unload', (e) => {
 const LEVEL = level_1_1;
 
 const WALLS = LEVEL.walls;
+const PUSHWALLS = LEVEL.pushWalls;
 const DOORS = LEVEL.doors;
 const OBJECTS = LEVEL.objects;
 
@@ -419,6 +420,7 @@ function getHorizontalCollision(angle, player, visibleCells) {
     const halfStepY = halfStepX * Math.tan(angle);
 
     let wall;
+    let pushWall;
     let door;
 
     let nextX = mapX;
@@ -452,6 +454,15 @@ function getHorizontalCollision(angle, player, visibleCells) {
                 color = wall.color;
                 sprite = wall.sprite;
             }
+
+            break;
+        }
+
+        pushWall = PUSHWALLS[cellY][cellX];
+
+        if (pushWall) {
+            color = pushWall.color;
+            sprite = pushWall.sprite;
 
             break;
         }
@@ -506,6 +517,7 @@ function getVerticalCollision(angle, player, visibleCells) {
     const halfStepY = halfStepX * Math.tan(angle);
 
     let wall;
+    let pushWall;
     let door;
 
     let nextX = mapX;
@@ -539,6 +551,15 @@ function getVerticalCollision(angle, player, visibleCells) {
                 color = wall.darkColor;
                 sprite = wall.darkSprite;
             }
+
+            break;
+        }
+
+        pushWall = PUSHWALLS[cellY][cellX];
+
+        if (pushWall) {
+            color = pushWall.darkColor;
+            sprite = pushWall.darkSprite;
 
             break;
         }
@@ -688,6 +709,29 @@ function movePlayer(delta) {
             }
         }
 
+        // Check if there's a push wall to action
+        let pushWall = PUSHWALLS[actionY][actionX];
+
+        if (pushWall) {
+            const positionX = Math.floor(player.x);
+            const positionY = Math.floor(player.y);
+
+            if (positionX < actionX) {
+                // Push East
+                PUSHWALLS[actionY][actionX + 1] = PUSHWALLS[actionY][actionX];
+            } else if (positionX > actionX) {
+                // Push West
+                PUSHWALLS[actionY][actionX - 1] = PUSHWALLS[actionY][actionX];
+            } else if (positionY < actionY) {
+                // Push South
+                PUSHWALLS[actionY + 1][actionX] = PUSHWALLS[actionY][actionX];
+            } else if (positionY > actionY) {
+                // Push North
+                PUSHWALLS[actionY - 1][actionX] = PUSHWALLS[actionY][actionX];
+            }
+            PUSHWALLS[actionY][actionX] = undefined;
+        }
+
         // Check if there's a wall to action
         let wall = WALLS[actionY][actionX];
 
@@ -786,6 +830,9 @@ function tryMovePlayer(x, y) {
     for (let y = yl; y <= yh; y++) {
         for (let x = xl; x <= xh; x++) {
             if (WALLS[y][x]) {
+                return false;
+            }
+            if (PUSHWALLS[y][x]) {
                 return false;
             }
             if (DOORS[y][x] && DOORS[y][x].action !== DOOR_OPEN) {
@@ -915,13 +962,13 @@ function renderMap(ctx, map, rays, largeMap) {
     for (let y = 0; y < map.length; y++) {
         for (let x = 0; x < map[0].length; x++) {
 
-            const wall = map[y][x];
+            const wallOrPushWall = map[y][x] || PUSHWALLS[y][x];
 
-            if (!wall) {
+            if (!wallOrPushWall) {
                 continue;
             }
 
-            ctx.fillStyle = wall.color;
+            ctx.fillStyle = wallOrPushWall.color;
             ctx.fillRect(left + x * scale, top + y * scale, scale, scale);
         }
     }
