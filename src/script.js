@@ -10,6 +10,7 @@ import PerformanceCounter from './performance-counter';
 const PI = Math.PI;
 const DOUBLE_PI = PI * 2;
 const HALF_PI = PI / 2;
+const QUARTER_PI = PI / 4;
 const DEG_TO_PI = PI / 180;
 
 const SCREEN_SCALE = 2.25;
@@ -40,6 +41,11 @@ const MOVE_NORMAL = .06;
 const MOVE_FAST = .10;
 
 const TURN_RADIUS = DEG_TO_PI * 1.5;
+
+const DIRECTION_NORTH = 0;
+const DIRECTION_SOUTH = 1;
+const DIRECTION_EAST = 2;
+const DIRECTION_WEST = 3;
 
 const DOOR_OPEN = 1;
 const DOOR_CLOSED = 2;
@@ -389,6 +395,21 @@ function fixAngle(angle) {
     return angle;
 }
 
+
+function getDirection(angle) {
+    angle = fixAngle(angle + QUARTER_PI);
+
+    if (angle < HALF_PI) {
+        return DIRECTION_EAST;
+    } else if (angle < PI) {
+        return DIRECTION_NORTH;
+    } else if (angle < 3 * HALF_PI) {
+        return DIRECTION_WEST;
+    } else {
+        return DIRECTION_SOUTH;
+    }
+}
+
 /**
  * Corrects the provided distance to compensate for fish-eye effect.
  * @param {number} distance The ray distance.
@@ -713,23 +734,29 @@ function movePlayer(delta) {
         let pushWall = PUSHWALLS[actionY][actionX];
 
         if (pushWall) {
-            const positionX = Math.floor(player.x);
-            const positionY = Math.floor(player.y);
+            const direction = getDirection(player.angle);
+            let dy = 0, dx = 0;
 
-            if (positionX < actionX) {
-                // Push East
-                PUSHWALLS[actionY][actionX + 1] = PUSHWALLS[actionY][actionX];
-            } else if (positionX > actionX) {
-                // Push West
-                PUSHWALLS[actionY][actionX - 1] = PUSHWALLS[actionY][actionX];
-            } else if (positionY < actionY) {
-                // Push South
-                PUSHWALLS[actionY + 1][actionX] = PUSHWALLS[actionY][actionX];
-            } else if (positionY > actionY) {
-                // Push North
-                PUSHWALLS[actionY - 1][actionX] = PUSHWALLS[actionY][actionX];
+            switch (direction) {
+                case DIRECTION_NORTH:
+                    dy = -1;
+                    break;
+                case DIRECTION_SOUTH:
+                    dy = 1;
+                    break;
+                case DIRECTION_EAST:
+                    dx = -1;
+                    break;
+                case DIRECTION_WEST:
+                    dx = 1;
+                    break;
             }
-            PUSHWALLS[actionY][actionX] = undefined;
+
+            // Check for things blocking
+            if (!WALLS[actionY + dy][actionX + dx]) {
+                PUSHWALLS[actionY + dy][actionX + dx] = PUSHWALLS[actionY][actionX];
+                PUSHWALLS[actionY][actionX] = undefined;
+            }
         }
 
         // Check if there's a wall to action
