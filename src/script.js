@@ -10,6 +10,7 @@ import PerformanceCounter from './performance-counter';
 const PI = Math.PI;
 const DOUBLE_PI = PI * 2;
 const HALF_PI = PI / 2;
+const QUARTER_PI = PI / 4;
 const DEG_TO_PI = PI / 180;
 
 const SCREEN_SCALE = 2.25;
@@ -40,6 +41,11 @@ const MOVE_NORMAL = .06;
 const MOVE_FAST = .10;
 
 const TURN_RADIUS = DEG_TO_PI * 1.5;
+
+const DIRECTION_NORTH = 0;
+const DIRECTION_SOUTH = 1;
+const DIRECTION_EAST = 2;
+const DIRECTION_WEST = 3;
 
 const DOOR_OPEN = 1;
 const DOOR_CLOSED = 2;
@@ -98,6 +104,7 @@ window.addEventListener('unload', (e) => {
 const LEVEL = level_1_1;
 
 const WALLS = LEVEL.walls;
+const PUSHWALLS = LEVEL.pushWalls;
 const DOORS = LEVEL.doors;
 const OBJECTS = LEVEL.objects;
 
@@ -391,6 +398,21 @@ function fixAngle(angle) {
     return angle;
 }
 
+
+function getDirection(angle) {
+    angle = fixAngle(angle + QUARTER_PI);
+
+    if (angle < HALF_PI) {
+        return DIRECTION_EAST;
+    } else if (angle < PI) {
+        return DIRECTION_NORTH;
+    } else if (angle < 3 * HALF_PI) {
+        return DIRECTION_WEST;
+    } else {
+        return DIRECTION_SOUTH;
+    }
+}
+
 /**
  * Corrects the provided distance to compensate for fish-eye effect.
  * @param {number} distance The ray distance.
@@ -422,6 +444,7 @@ function getHorizontalCollision(angle, player, visibleCells) {
     const halfStepY = halfStepX * Math.tan(angle);
 
     let wall;
+    let pushWall;
     let door;
 
     let nextX = mapX;
@@ -455,6 +478,15 @@ function getHorizontalCollision(angle, player, visibleCells) {
                 color = wall.color;
                 sprite = wall.sprite;
             }
+
+            break;
+        }
+
+        pushWall = PUSHWALLS[cellY][cellX];
+
+        if (pushWall) {
+            color = pushWall.color;
+            sprite = pushWall.sprite;
 
             break;
         }
@@ -509,6 +541,7 @@ function getVerticalCollision(angle, player, visibleCells) {
     const halfStepY = halfStepX * Math.tan(angle);
 
     let wall;
+    let pushWall;
     let door;
 
     let nextX = mapX;
@@ -542,6 +575,15 @@ function getVerticalCollision(angle, player, visibleCells) {
                 color = wall.darkColor;
                 sprite = wall.darkSprite;
             }
+
+            break;
+        }
+
+        pushWall = PUSHWALLS[cellY][cellX];
+
+        if (pushWall) {
+            color = pushWall.darkColor;
+            sprite = pushWall.darkSprite;
 
             break;
         }
@@ -693,6 +735,35 @@ function movePlayer(delta) {
             }
         }
 
+        // Check if there's a push wall to action
+        let pushWall = PUSHWALLS[actionY][actionX];
+
+        if (pushWall) {
+            const direction = getDirection(player.angle);
+            let dy = 0, dx = 0;
+
+            switch (direction) {
+                case DIRECTION_NORTH:
+                    dy = -1;
+                    break;
+                case DIRECTION_SOUTH:
+                    dy = 1;
+                    break;
+                case DIRECTION_EAST:
+                    dx = -1;
+                    break;
+                case DIRECTION_WEST:
+                    dx = 1;
+                    break;
+            }
+
+            // Check for things blocking
+            if (!WALLS[actionY + dy][actionX + dx]) {
+                PUSHWALLS[actionY + dy][actionX + dx] = PUSHWALLS[actionY][actionX];
+                PUSHWALLS[actionY][actionX] = undefined;
+            }
+        }
+
         // Check if there's a wall to action
         let wall = WALLS[actionY][actionX];
 
@@ -791,6 +862,9 @@ function tryMovePlayer(x, y) {
     for (let y = yl; y <= yh; y++) {
         for (let x = xl; x <= xh; x++) {
             if (WALLS[y][x]) {
+                return false;
+            }
+            if (PUSHWALLS[y][x]) {
                 return false;
             }
             if (DOORS[y][x] && DOORS[y][x].action !== DOOR_OPEN) {
@@ -936,13 +1010,13 @@ function renderMap(ctx, map, rays, largeMap) {
     for (let y = 0; y < map.length; y++) {
         for (let x = 0; x < map[0].length; x++) {
 
-            const wall = map[y][x];
+            const wallOrPushWall = map[y][x] || PUSHWALLS[y][x];
 
-            if (!wall) {
+            if (!wallOrPushWall) {
                 continue;
             }
 
-            ctx.fillStyle = wall.color;
+            ctx.fillStyle = wallOrPushWall.color;
             ctx.fillRect(left + x * scale, top + y * scale, scale, scale);
         }
     }
