@@ -999,8 +999,10 @@ function renderScene(ctx, rays, dx, dy, dw, dh) {
  */
 function renderObjects(ctx, rays, visibleCells, objects, dx, dy, dw, dh) {
 
-    // TODO: Sort the objects by distance, furthest to nearest.
-    const visibleObjects = objects.flatMap((row, y) => row.filter((obj, x) => obj && visibleCells[y][x]));
+    let visibleObjects = objects.flatMap((row, y) => row.filter((obj, x) => obj && visibleCells[y][x]));
+    
+    // Sort the objects by distance, furthest to nearest.
+    visibleObjects = visibleObjects.map(obj => [Vector.distance(player.x, player.y, obj.x, obj.y), obj]).sort((a, b) => b[0] - a[0]).map(x => x[1]);
 
     for (let i = 0; i < visibleObjects.length; i++) {
 
