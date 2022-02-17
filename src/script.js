@@ -108,7 +108,7 @@ const PUSHWALLS = LEVEL.pushWalls;
 const DOORS = LEVEL.doors;
 const OBJECTS = LEVEL.objects;
 
-const MINIMAP_VISIBILITY = WALLS.map((row) => row.map(col => 0));
+const VISIBILITY = WALLS.map(row => row.map(col => 0));
 
 // Spritesheet
 //
@@ -406,11 +406,11 @@ function floodFillMinimap(x, y) {
         return;
     }
 
-    if (MINIMAP_VISIBILITY[y][x] > 0) {
+    if (VISIBILITY[y][x] > 0) {
         return;
     }
 
-    MINIMAP_VISIBILITY[y][x] = 1;
+    VISIBILITY[y][x] = 1;
 
     if (WALLS[y][x] || DOORS[y][x] || PUSHWALLS[y][x]) {
         return;
@@ -793,9 +793,6 @@ function movePlayer(delta) {
                 case DOOR_CLOSED:
                 case DOOR_CLOSING:
                     door.action = DOOR_OPENING;
-                    const dirY = actionY - Math.floor(player.y);
-                    const dirX = actionX - Math.floor(player.x);
-                    floodFillMinimap(actionX + dirX, actionY + dirY);
                     break;
                 case DOOR_OPEN:
                 case DOOR_OPENING:
@@ -912,6 +909,10 @@ function moveDoors(delta) {
                         door.position = 1;
                         door.ticks = 0;
                         door.action = DOOR_OPEN;
+
+                        const dirY = y - Math.floor(player.y);
+                        const dirX = x - Math.floor(player.x);
+                        floodFillMinimap(x + dirX, y + dirY);
                     }
 
                     break;
@@ -1138,7 +1139,7 @@ function renderMap(ctx, map, rays, largeMap) {
     for (let y = 0; y < map.length; y++) {
         for (let x = 0; x < map[0].length; x++) {
 
-            if (MINIMAP_VISIBILITY[y][x] === 0) {
+            if (VISIBILITY[y][x] === 0) {
                 continue;
             }
 
@@ -1163,7 +1164,7 @@ function renderMap(ctx, map, rays, largeMap) {
 
             const door = DOORS[y][x];
 
-            if (!door || MINIMAP_VISIBILITY[y][x] === 0) {
+            if (!door || VISIBILITY[y][x] === 0) {
                 continue;
             }
 
