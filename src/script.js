@@ -257,6 +257,19 @@ let player = JSON.parse(localStorage.getItem('player')) ?? { ...PLAYER_DEFAULT, 
 //
 
 function startGame() {
+
+    // If player is in door way, make door open.
+    const mapY = Math.floor(player.y),
+          mapX = Math.floor(player.x);
+
+    const door = DOORS[mapY][mapX];
+
+    if (door) {
+        door.action = DOOR_OPEN;
+        door.position = 1;
+    }
+
+    // Start the game loop
     requestAnimationFrame(loop);
 }
 
@@ -439,7 +452,7 @@ function isOutOfBounds(sx, sy, dw, dh) {
     return sx < 0 || sx >= dw || sy < 0 || sy >= dh;
 }
 
-function getHorizontalCollision(angle, player, visibleCells) {
+function getHorizontalCollision(angle, player) {
 
     const up = Math.abs(Math.floor(angle / PI) % 2) > 0;
 
@@ -545,7 +558,7 @@ function getHorizontalCollision(angle, player, visibleCells) {
     };
 }
 
-function getVerticalCollision(angle, player, visibleCells) {
+function getVerticalCollision(angle, player) {
 
     const right = Math.abs(Math.floor((angle - HALF_PI) / PI) % 2) > 0;
 
@@ -851,9 +864,13 @@ function moveDoors(delta) {
 
             switch (door.action) {
                 case DOOR_OPEN:
-                    door.ticks += delta;
+                    if (Math.floor(player.x) === x && Math.floor(player.y) === y) {
+                        door.ticks = 0;
+                    } else {
+                        door.ticks += delta;
+                    }
 
-                    if (door.ticks >= DOOR_OPEN_TICKS && (Math.floor(player.x) != x || Math.floor(player.y) != y)) {
+                    if (door.ticks >= DOOR_OPEN_TICKS) {
                         door.action = DOOR_CLOSING;
                     }
 
