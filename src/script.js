@@ -324,6 +324,7 @@ function update(delta) {
 
     movePlayer(delta);
     moveDoors(delta);
+    movePushWalls(delta);
 }
 
 function render(rays, visibleCells, x, y, w, h) {
@@ -400,16 +401,24 @@ function fixAngle(angle) {
 
 
 function getDirection(angle) {
-    angle = fixAngle(angle + QUARTER_PI);
+    angle = angle + QUARTER_PI;
 
-    if (angle < HALF_PI) {
-        return DIRECTION_EAST;
-    } else if (angle < PI) {
+    while (angle < 0) {
+        angle += DOUBLE_PI;
+    }
+
+    while (angle > DOUBLE_PI) {
+        angle -= DOUBLE_PI;
+    }
+
+    if (angle > 3 * HALF_PI) {
         return DIRECTION_NORTH;
-    } else if (angle < 3 * HALF_PI) {
+    } else if (angle > PI) {
         return DIRECTION_WEST;
-    } else {
+    } else if (angle > HALF_PI) {
         return DIRECTION_SOUTH;
+    } else {
+        return DIRECTION_EAST;
     }
 }
 
@@ -485,10 +494,19 @@ function getHorizontalCollision(angle, player, visibleCells) {
         pushWall = PUSHWALLS[cellY][cellX];
 
         if (pushWall) {
-            color = pushWall.color;
-            sprite = pushWall.sprite;
 
-            break;
+            const pushWallY = Math.abs(stepY) * pushWall.position * pushWall.dirY;
+            const pushWallX = pushWallY / Math.tan(angle);
+
+            if (pushWall.action === 0 || Math.floor(nextX + pushWallX) === cellX) {
+                color = pushWall.color;
+                sprite = pushWall.sprite;
+
+                nextX += pushWallX;
+                nextY += pushWallY;
+
+                break;
+            }
         }
 
         door = DOORS[cellY][cellX];
@@ -582,10 +600,19 @@ function getVerticalCollision(angle, player, visibleCells) {
         pushWall = PUSHWALLS[cellY][cellX];
 
         if (pushWall) {
-            color = pushWall.darkColor;
-            sprite = pushWall.darkSprite;
 
-            break;
+            const pushWallX = Math.abs(stepX) * pushWall.position * pushWall.dirX;
+            const pushWallY = pushWallX * Math.tan(angle);
+
+            if (pushWall.action === 0 || Math.floor(nextY + pushWallY) === cellY) {
+                color = pushWall.darkColor;
+                sprite = pushWall.darkSprite;
+
+                nextX += pushWallX;
+                nextY += pushWallY;
+
+                break;
+            }
         }
 
         door = DOORS[cellY][cellX];
@@ -662,7 +689,7 @@ function getRays(player, w) {
 function movePlayer(delta) {
 
     // At 100 fps, delta is 10.
-    const timeScale = 10 / delta;
+    const timeScale = delta / 1000 * 100;
 
     // Speed
 
@@ -699,7 +726,6 @@ function movePlayer(delta) {
     } else {
         player.side = 0;
     }
-    
 
     // Turning
 
@@ -750,17 +776,19 @@ function movePlayer(delta) {
                     dy = 1;
                     break;
                 case DIRECTION_EAST:
-                    dx = -1;
+                    dx = 1;
                     break;
                 case DIRECTION_WEST:
-                    dx = 1;
+                    dx = -1;
                     break;
             }
 
             // Check for things blocking
             if (!WALLS[actionY + dy][actionX + dx]) {
-                PUSHWALLS[actionY + dy][actionX + dx] = PUSHWALLS[actionY][actionX];
-                PUSHWALLS[actionY][actionX] = undefined;
+                pushWall.dirX = dx;
+                pushWall.dirY = dy;
+                pushWall.position = 0;
+                pushWall.action = 1;
             }
         }
 
@@ -844,6 +872,38 @@ function moveDoors(delta) {
                     break;
             }
 
+        }
+    }
+}
+
+function movePushWalls(delta) {
+
+    for (let y = 0; y < PUSHWALLS.length; y++) {
+        for (let x = 0; x < PUSHWALLS[y].length; x++) {
+
+            const pushWall = PUSHWALLS[y][x];
+
+            if (!pushWall || !pushWall.action) {
+                continue;
+            }
+
+            if (pushWall.action > 0) {
+                pushWall.position += delta / 1000;
+
+                if (pushWall.position >= 1) {
+                    pushWall.action = 0;
+                    pushWall.position = 0;
+
+                    // Move the wall on the map
+                    PUSHWALLS[y][x] = undefined;
+                    PUSHWALLS[y + pushWall.dirY][x + pushWall.dirX] = pushWall;
+
+                    // If the next tile isn't a wall, we'll continue moving the push wall.
+                    if (!WALLS[y + pushWall.dirY * 2][x + pushWall.dirX * 2] && !PUSHWALLS[y + pushWall.dirY * 2][x + pushWall.dirX * 2]) {
+                        pushWall.action = 1;
+                    }
+                }
+            }
         }
     }
 }
@@ -1010,14 +1070,18 @@ function renderMap(ctx, map, rays, largeMap) {
     for (let y = 0; y < map.length; y++) {
         for (let x = 0; x < map[0].length; x++) {
 
-            const wallOrPushWall = map[y][x] || PUSHWALLS[y][x];
+            const wall = map[y][x];
+            const pushWall = PUSHWALLS[y][x];
 
-            if (!wallOrPushWall) {
-                continue;
+            if (wall) {
+                ctx.fillStyle = wall.color;
+                ctx.fillRect(left + x * scale, top + y * scale, scale, scale);
             }
 
-            ctx.fillStyle = wallOrPushWall.color;
-            ctx.fillRect(left + x * scale, top + y * scale, scale, scale);
+            if (pushWall) {
+                ctx.fillStyle = pushWall.color;
+                ctx.fillRect(left + (x + pushWall.position * pushWall.dirX) * scale, top + (y + pushWall.position * pushWall.dirY) * scale, scale, scale);
+            }
         }
     }
 

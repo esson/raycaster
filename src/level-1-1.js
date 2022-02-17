@@ -63,7 +63,7 @@ function createLevel() {
     ];
 
     const wallSprites = {
-        '1': { color: '#797979', darkColor: '#616161', sprite: 0, darkSprite: 1 }, // Stone Wall
+        '1': { color: '#797979', darkColor: '#616161', sprite:  0, darkSprite:  1 }, // Stone Wall
         '2': { color: '#09096f', darkColor: '#070759', sprite: 14, darkSprite: 15 }, // Blue Stone Wall
         '3': { color: '#604220', darkColor: '#4d351a', sprite: 22, darkSprite: 23 }, // Wood Panel Wall
         '4': { color: '#09096f', darkColor: '#070759', sprite:  8, darkSprite:  9 }, // Blue Stone Wall - Cell
@@ -131,11 +131,11 @@ function createLevel() {
         '-                -      ---     -   -         ------ - - - --  ',
         '-                         -     -   -               - - - -    ',
         '-                -      ---     -   -                          ',
-        '------------------ ------       -   -                          ',
-        '          --  -     -      ------- -------                     ',
+        '------------------1------       -   -                          ',
+        '          --  -  1  -      ------- -------                     ',
         '         -    -  - -       -    -   -    -                     ',
         '          --     --        -             -                     ',
-        '            - ----         -    -   -    -                     ',
+        '            -1----         -    -   -    -                     ',
         '            -  -           -    -   -    -                     ',
         '            -  -           ------   ------                     ',
         '            ----           -    -   -    -                     ',
@@ -191,11 +191,11 @@ function createLevel() {
         '-                -      ---     -   -         ------ - - - --  ',
         '-                       2 -     -   -               - - - -    ',
         '-                -      ---     -   -                          ',
-        '------------------1------       -   -                          ',
-        '          --  -  1  -      -------1-------                     ',
+        '------------------ ------       -   -                          ',
+        '          --  -     -      -------1-------                     ',
         '         -    -  - -       -    -   -    -                     ',
         '          --     --        -    1   1    -                     ',
-        '            -1----         -    -   -    -                     ',
+        '            - ----         -    -   -    -                     ',
         '            -  -           -    -   -    -                     ',
         '            -  -           ------   ------                     ',
         '            ----           -    -   -    -                     ',
@@ -299,7 +299,15 @@ function createLevel() {
         floor: '#707070',
 
         walls: walls.map(mapLiteralToSpriteObject(wallSprites, true)),
-        pushWalls: pushWalls.map(mapLiteralToSpriteObject(wallSprites, false)),
+        pushWalls: pushWalls.map(mapLiteralToSpriteObject(wallSprites, false)).map((row, y) => row.map((col, x) => {
+            if (col) {
+                col.action = 0;
+                col.position = 0;
+                col.dirX = 0;
+                col.dirY = 0;
+            }
+            return col;
+        })),
         doors: doors.map(mapLiteralToSpriteObject(doorSprites, false)),
         objects: objects.map(mapLiteralToSpriteObject(objectSprites, false, true)),
 
