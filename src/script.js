@@ -108,6 +108,8 @@ const PUSHWALLS = LEVEL.pushWalls;
 const DOORS = LEVEL.doors;
 const OBJECTS = LEVEL.objects;
 
+const MINIMAP_VISIBILITY = WALLS.map((row) => row.map(col => 0));
+
 // Spritesheet
 //
 
@@ -214,7 +216,7 @@ const keyboardToFunctionMap = {
     // Toggle Smoothing
     KeyP: () => setMessageText('SMOOTHING', ctx.imageSmoothingEnabled = !ctx.imageSmoothingEnabled),
     // Reset
-    KeyR: () => (setMessageText('PLAYER RESET'), player = { ...PLAYER_DEFAULT, x: LEVEL.spawn.x, y: LEVEL.spawn.y }),
+    KeyR: () => (setMessageText('PLAYER RESET'), player = { ...PLAYER_DEFAULT, x: LEVEL.spawn.x, y: LEVEL.spawn.y }, floodFillMinimap(Math.floor(player.x), Math.floor(player.y))),
     // Zoom In
     NumpadAdd: () => GAME_DISPLAY = Math.min(GAME_DISPLAY + 1, 3),
     // Zoom Out
@@ -260,7 +262,7 @@ function startGame() {
 
     // If player is in door way, make door open.
     const mapY = Math.floor(player.y),
-          mapX = Math.floor(player.x);
+        mapX = Math.floor(player.x);
 
     const door = DOORS[mapY][mapX];
 
@@ -268,6 +270,9 @@ function startGame() {
         door.action = DOOR_OPEN;
         door.position = 1;
     }
+
+    // Fill the minimap
+    floodFillMinimap(mapX, mapY);
 
     // Start the game loop
     requestAnimationFrame(loop);
@@ -393,6 +398,28 @@ function render(rays, visibleCells, x, y, w, h) {
             renderMessage(ctx, messageText);
         }
     }
+}
+
+function floodFillMinimap(x, y) {
+
+    if (y < 0 || y >= WALLS.length || x < 0 || x >= WALLS[y].length) {
+        return;
+    }
+
+    if (MINIMAP_VISIBILITY[y][x] > 0) {
+        return;
+    }
+
+    MINIMAP_VISIBILITY[y][x] = 1;
+
+    if (WALLS[y][x] || DOORS[y][x] || PUSHWALLS[y][x]) {
+        return;
+    }
+
+    floodFillMinimap(x - 1, y);
+    floodFillMinimap(x + 1, y);
+    floodFillMinimap(x, y - 1);
+    floodFillMinimap(x, y + 1);
 }
 
 /**
@@ -766,6 +793,9 @@ function movePlayer(delta) {
                 case DOOR_CLOSED:
                 case DOOR_CLOSING:
                     door.action = DOOR_OPENING;
+                    const dirY = actionY - Math.floor(player.y);
+                    const dirX = actionX - Math.floor(player.x);
+                    floodFillMinimap(actionX + dirX, actionY + dirY);
                     break;
                 case DOOR_OPEN:
                 case DOOR_OPENING:
@@ -925,6 +955,8 @@ function movePushWalls(delta) {
                     // If the next tile isn't a wall, we'll continue moving the push wall.
                     if (!WALLS[y + pushWall.dirY * 2][x + pushWall.dirX * 2] && !PUSHWALLS[y + pushWall.dirY * 2][x + pushWall.dirX * 2]) {
                         pushWall.action = 1;
+                    } else {
+                        floodFillMinimap(x, y);
                     }
                 }
             }
@@ -1017,7 +1049,7 @@ function renderScene(ctx, rays, dx, dy, dw, dh) {
 function renderObjects(ctx, rays, visibleCells, objects, dx, dy, dw, dh) {
 
     let visibleObjects = objects.flatMap((row, y) => row.filter((obj, x) => obj && visibleCells[y][x]));
-    
+
     // Sort the objects by distance, furthest to nearest.
     visibleObjects = visibleObjects.map(obj => [Vector.distance(player.x, player.y, obj.x, obj.y), obj]).sort((a, b) => b[0] - a[0]).map(x => x[1]);
 
@@ -1064,6 +1096,13 @@ function renderObjects(ctx, rays, visibleCells, objects, dx, dy, dw, dh) {
     }
 }
 
+/**
+ * 
+ * @param {CanvasRenderingContext2D} ctx 
+ * @param {*} map 
+ * @param {*} rays 
+ * @param {*} largeMap 
+ */
 function renderMap(ctx, map, rays, largeMap) {
 
     const scale = Math.floor(SCREEN_HEIGHT / WALLS.length / 2);
@@ -1099,6 +1138,10 @@ function renderMap(ctx, map, rays, largeMap) {
     for (let y = 0; y < map.length; y++) {
         for (let x = 0; x < map[0].length; x++) {
 
+            if (MINIMAP_VISIBILITY[y][x] === 0) {
+                continue;
+            }
+
             const wall = map[y][x];
             const pushWall = PUSHWALLS[y][x];
 
@@ -1120,7 +1163,7 @@ function renderMap(ctx, map, rays, largeMap) {
 
             const door = DOORS[y][x];
 
-            if (!door || door.action === DOOR_OPEN) {
+            if (!door || MINIMAP_VISIBILITY[y][x] === 0) {
                 continue;
             }
 
@@ -1128,10 +1171,10 @@ function renderMap(ctx, map, rays, largeMap) {
 
             if (map[y - 1][x]) {
                 // Vertical door
-                ctx.fillRect(left + x * scale + scale / 3, top + y * scale, scale / 3, scale);
+                ctx.fillRect(left + x * scale + scale / 3, top + (y + door.position) * scale, scale / 3, scale * (1 - door.position));
             } else {
                 // Horizontal door
-                ctx.fillRect(left + x * scale, top + y * scale + scale / 3, scale, scale / 3);
+                ctx.fillRect(left + (x + door.position) * scale, top + y * scale + scale / 3, scale * (1 - door.position), scale / 3);
             }
         }
 
