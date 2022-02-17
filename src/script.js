@@ -34,7 +34,7 @@ const OSD_FONT = '12px monospace';
 const OSD_HEIGHT = 20;
 const OSD_MIDDLE = OSD_HEIGHT / 2;
 
-const PLAYER_SIZE = 1 / 4;
+const PLAYER_SIZE = 1 / 3;
 
 const MOVE_SLOW = .04;
 const MOVE_NORMAL = .06;
@@ -804,30 +804,37 @@ function movePlayer(delta) {
 
     // Move the Player
 
+    let moveX = 0;
+    let moveY = 0;
+
     if (player.speed !== 0) {
-
-        let moveX = Math.cos(player.angle) * player.speed;
-        let moveY = Math.sin(player.angle) * player.speed;
-
-        if (tryMovePlayer(player.x + moveX, player.y)) {
-            player.x += moveX;
-        }
-        if (tryMovePlayer(player.x, player.y + moveY)) {
-            player.y += moveY;
-        }
+        moveX += Math.cos(player.angle) * player.speed;
+        moveY += Math.sin(player.angle) * player.speed;
     }
 
     if (player.side !== 0) {
+        moveX += Math.sin(player.angle) * player.side;
+        moveY -= Math.cos(player.angle) * player.side;
+    }
 
-        let moveX = Math.cos(player.angle - HALF_PI) * player.side;
-        let moveY = Math.sin(player.angle - HALF_PI) * player.side;
+    if (moveX === 0 && moveY === 0) {
+        return;
+    }
 
-        if (tryMovePlayer(player.x + moveX, player.y)) {
-            player.x += moveX;
-        }
-        if (tryMovePlayer(player.x, player.y + moveY)) {
-            player.y += moveY;
-        }
+    if (tryMovePlayer(player.x + moveX, player.y + moveY)) {
+        player.x += moveX;
+        player.y += moveY;
+        return;
+    }
+
+    if (moveX && tryMovePlayer(player.x + moveX, player.y)) {
+        player.x += moveX;
+        return;
+    }
+
+    if (moveY && tryMovePlayer(player.x, player.y + moveY)) {
+        player.y += moveY;
+        return;
     }
 }
 
@@ -919,15 +926,18 @@ function tryMovePlayer(x, y) {
     var xh = Math.floor(x + PLAYER_SIZE);
     var yh = Math.floor(y + PLAYER_SIZE);
 
-    for (let y = yl; y <= yh; y++) {
-        for (let x = xl; x <= xh; x++) {
-            if (WALLS[y][x]) {
+    for (let dy = yl; dy <= yh; dy++) {
+        for (let dx = xl; dx <= xh; dx++) {
+            if (WALLS[dy][dx]) {
                 return false;
             }
-            if (PUSHWALLS[y][x]) {
+            if (PUSHWALLS[dy][dx]) {
                 return false;
             }
-            if (DOORS[y][x] && DOORS[y][x].action !== DOOR_OPEN) {
+            if (DOORS[dy][dx] && DOORS[dy][dx].action !== DOOR_OPEN) {
+                return false;
+            }
+            if (OBJECTS[dy][dx] && OBJECTS[dy][dx].solid) {
                 return false;
             }
         }
