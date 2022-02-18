@@ -3,6 +3,7 @@ import Vector from './vector';
 import level_1_1 from './level-1-1'
 import fps from './fps'
 import PerformanceCounter from './performance-counter';
+import { getSpritesheetCoordinates } from './sprites';
 
 // Constants
 //
@@ -66,10 +67,29 @@ const PERFORMANCE_HEIGHT = 75;
 const PERFORMANCE_X = SCREEN_WIDTH - PERFORMANCE_WIDTH - 10;
 const PERFORMANCE_Y = SCREEN_HEIGHT - (PERFORMANCE_HEIGHT + 5) * 2 - 10;
 
+const WEAPONS = [{
+    isFiring: false,
+    position: 0,
+    sprite: [522, 523, 524, 525, 526].map(x => getSpritesheetCoordinates(x)),
+}, {
+    isFiring: false,
+    position: 0,
+    sprite: [527, 528, 529, 530, 531].map(x => getSpritesheetCoordinates(x)),
+}, {
+    isFiring: false,
+    position: 0,
+    sprite: [532, 533, 534, 535, 536].map(x => getSpritesheetCoordinates(x)),
+}, {
+    isFiring: false,
+    position: 0,
+    sprite: [537, 538, 539, 540, 541].map(x => getSpritesheetCoordinates(x)),
+}]
+
 const PLAYER_DEFAULT = {
     angle: 0,
     speed: 0,
-    side: 0
+    side: 0,
+    weapon: WEAPONS[0]
 };
 
 // Settings
@@ -189,6 +209,12 @@ const keyboardToControlToggleMap = {
 };
 
 const keyboardToFunctionMap = {
+    // Toggle Weapon 1
+    Digit1: () => player.weapon = WEAPONS[0],
+    Digit2: () => player.weapon = WEAPONS[1],
+    Digit3: () => player.weapon = WEAPONS[2],
+    Digit4: () => player.weapon = WEAPONS[3],
+    Digit5: () => player.weapon = null,
     // Toggle Mini-Map
     KeyM: () => {
         switch (controls.map) {
@@ -377,6 +403,7 @@ function render(rays, visibleCells, x, y, w, h) {
     // Render the game screen.
     renderScene(ctx, rays, x, y, w, h);
     renderObjects(ctx, rays, visibleCells, OBJECTS, x, y, w, h);
+    renderPlayer(ctx, player, x, y, w, h);
 
     // Restore to stop clipping.
     ctx.restore();
@@ -412,7 +439,26 @@ function floodFillMinimap(x, y) {
 
     VISIBILITY[y][x] = 1;
 
+    // Stop at walls/doors/push walls
     if (WALLS[y][x] || DOORS[y][x] || PUSHWALLS[y][x]) {
+
+        // Fill Wall Corners
+
+        // Top Right
+        if (WALLS[y][x] && !isOutOfBounds(x + 1, y + 1, WALLS[0].length, WALLS.length) && WALLS[y + 1][x + 1] && WALLS[y][x + 1]) VISIBILITY[y][x + 1] = 1;
+        // Right Top
+        if (WALLS[y][x] && !isOutOfBounds(x - 1, y - 1, WALLS[0].length, WALLS.length) && WALLS[y - 1][x - 1] && WALLS[y - 1][x]) VISIBILITY[y - 1][x] = 1;
+        // Right Bottom
+        if (WALLS[y][x] && !isOutOfBounds(x - 1, y + 1, WALLS[0].length, WALLS.length) && WALLS[y + 1][x - 1] && WALLS[y + 1][x]) VISIBILITY[y + 1][x] = 1;
+        // Bottom Right
+        if (WALLS[y][x] && !isOutOfBounds(x + 1, y - 1, WALLS[0].length, WALLS.length) && WALLS[y - 1][x + 1] && WALLS[y][x + 1]) VISIBILITY[y][x + 1] = 1;
+        // Bottom Left
+        if (WALLS[y][x] && !isOutOfBounds(x - 1, y - 1, WALLS[0].length, WALLS.length) && WALLS[y - 1][x - 1] && WALLS[y][x - 1]) VISIBILITY[y][x - 1] = 1;
+        // Left Top
+        if (WALLS[y][x] && !isOutOfBounds(x + 1, y - 1, WALLS[0].length, WALLS.length) && WALLS[y - 1][x + 1] && WALLS[y - 1][x]) VISIBILITY[y - 1][x] = 1;
+        // Top Left
+        if (WALLS[y][x] && !isOutOfBounds(x - 1, y + 1, WALLS[0].length, WALLS.length) && WALLS[y + 1][x - 1] && WALLS[y][x - 1]) VISIBILITY[y][x - 1] = 1;
+
         return;
     }
 
@@ -517,7 +563,7 @@ function getHorizontalCollision(angle, player) {
         wall = WALLS[cellY][cellX];
 
         if (wall) {
-            // If cell is adjacent to wall, we render door frame
+            // If cell is adjacent to door, we render door frame
             let adjacentDoor = up ? DOORS[cellY + 1][cellX] : DOORS[cellY - 1][cellX];
 
             if (adjacentDoor) {
@@ -623,7 +669,7 @@ function getVerticalCollision(angle, player) {
         wall = WALLS[cellY][cellX];
 
         if (wall) {
-            // If cell is adjacent to wall, we render door frame
+            // If cell is adjacent to door, we render door frame
             let adjacentDoor = right ? DOORS[cellY][cellX - 1] : DOORS[cellY][cellX + 1];
 
             if (adjacentDoor) {
@@ -778,6 +824,13 @@ function movePlayer(delta) {
         }
     }
 
+    // Fire Weapon
+
+    if (controls.fire && player.weapon?.isFiring === false) {
+        player.weapon.isFiring = true;
+        player.weapon.position = 0;
+    }
+
     // Action / Open Doors
 
     if (controls.action) {
@@ -840,6 +893,17 @@ function movePlayer(delta) {
         }
 
         controls.action = false;
+    }
+
+    // Fire Weapon
+
+    if (player.weapon?.isFiring) {
+        player.weapon.position += delta / 400;
+
+        if (player.weapon.position >= 1) {
+            player.weapon.isFiring = false;
+            player.weapon.position = 0;
+        }
     }
 
     // Move the Player
@@ -1097,6 +1161,18 @@ function renderObjects(ctx, rays, visibleCells, objects, dx, dy, dw, dh) {
     }
 }
 
+function renderPlayer(ctx, player, dx, dy, dw, dh) {
+    
+    if (!player.weapon) {
+        return;
+    }
+
+    const spriteIndex = Math.floor(player.weapon.sprite.length * player.weapon.position);
+    const sprite = player.weapon.sprite[spriteIndex];
+
+    ctx.drawImage(spritesheet, sprite.x, sprite.y, SPRITE_SIZE, SPRITE_SIZE, dx + (dw - dh) / 2, dy, dh, dh);
+}
+
 /**
  * 
  * @param {CanvasRenderingContext2D} ctx 
@@ -1135,7 +1211,7 @@ function renderMap(ctx, map, rays, largeMap) {
     ctx.fillStyle = '#bbb';
     ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
 
-    // Walls
+    // Walls / Push Walls
     for (let y = 0; y < map.length; y++) {
         for (let x = 0; x < map[0].length; x++) {
 
