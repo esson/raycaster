@@ -857,7 +857,7 @@ function movePlayer(delta) {
         // Check if there's a push wall to action
         let pushWall = PUSHWALLS[actionY][actionX];
 
-        if (pushWall) {
+        if (pushWall && pushWall.action === 0) {
             const direction = getDirection(player.angle);
             let dy = 0, dx = 0;
 
